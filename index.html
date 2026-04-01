@@ -4,24 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tenny's Station</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-  <!-- MENU BAR -->
-  <div id="menubar">
-    <span class="menu-logo">⬛ TENNY'S STATION</span>
-    <div class="menu-links">
-      <span>文件</span>
-      <span>编辑</span>
-      <span>视图</span>
-    </div>
-    <div class="menu-right">
-      <span id="menuClock"></span>
-    </div>
-  </div>
 
   <!-- DESKTOP -->
   <div id="desktop">
@@ -29,19 +14,19 @@
     <!-- Desktop Icons -->
     <div class="desktop-icons">
       <div class="icon" data-app="notebook">
-        <div class="icon-img" style="background:linear-gradient(145deg,#f9c74f,#f3722c)">📓</div>
+        <div class="icon-img">📓</div>
         <span>留言板</span>
       </div>
       <div class="icon" data-app="about">
-        <div class="icon-img" style="background:linear-gradient(145deg,#4cc9f0,#4361ee)">👤</div>
+        <div class="icon-img">👤</div>
         <span>关于我</span>
       </div>
       <div class="icon" data-app="projects">
-        <div class="icon-img" style="background:linear-gradient(145deg,#7209b7,#560bad)">💼</div>
+        <div class="icon-img">💼</div>
         <span>项目</span>
       </div>
       <div class="icon" data-app="contact">
-        <div class="icon-img" style="background:linear-gradient(145deg,#f72585,#b5179e)">✉️</div>
+        <div class="icon-img">✉️</div>
         <span>联系我</span>
       </div>
     </div>
@@ -51,40 +36,62 @@
 
   </div>
 
-  <!-- DOCK -->
-  <div id="dock">
-    <div class="dock-item" data-app="notebook" title="留言板">
-      <div class="dock-icon" style="background:linear-gradient(145deg,#f9c74f,#f3722c)">📓</div>
+  <!-- TASKBAR -->
+  <div id="menubar">
+    <span class="menu-logo">开始</span>
+    <div class="taskbar-sep"></div>
+    <div id="dock">
+      <div class="dock-item" data-app="notebook" title="留言板">
+        <div class="dock-icon">📓</div>
+        <span class="dock-label">留言板</span>
+      </div>
+      <div class="dock-item" data-app="about" title="关于我">
+        <div class="dock-icon">👤</div>
+        <span class="dock-label">关于我</span>
+      </div>
+      <div class="dock-item" data-app="projects" title="项目">
+        <div class="dock-icon">💼</div>
+        <span class="dock-label">项目</span>
+      </div>
+      <div class="dock-item" data-app="contact" title="联系我">
+        <div class="dock-icon">✉️</div>
+        <span class="dock-label">联系我</span>
+      </div>
     </div>
-    <div class="dock-item" data-app="about" title="关于我">
-      <div class="dock-icon" style="background:linear-gradient(145deg,#4cc9f0,#4361ee)">👤</div>
-    </div>
-    <div class="dock-item" data-app="projects" title="项目">
-      <div class="dock-icon" style="background:linear-gradient(145deg,#7209b7,#560bad)">💼</div>
-    </div>
-    <div class="dock-item" data-app="contact" title="联系我">
-      <div class="dock-icon" style="background:linear-gradient(145deg,#f72585,#b5179e)">✉️</div>
-    </div>
+    <div class="taskbar-sep"></div>
+    <div class="menu-right" id="menuClock"></div>
   </div>
 
   <!-- WINDOW TEMPLATES -->
 
   <!-- Notebook / Guestbook -->
   <template id="tpl-notebook">
+    <div class="win-menubar">
+      <span>文件(F)</span><span>编辑(E)</span><span>帮助(H)</span>
+    </div>
     <div class="win-body notebook-body">
       <div class="nb-messages" id="nb-messages">
         <div class="nb-loading">加载留言中...</div>
       </div>
       <div class="nb-form">
-        <input class="nb-name" id="nb-name" type="text" placeholder="你的名字（可匿名）" maxlength="20" />
-        <textarea class="nb-text" id="nb-text" placeholder="留下你的留言吧 ✨" maxlength="200" rows="3"></textarea>
+        <label style="font-size:11px;margin-bottom:2px;">你的名字：</label>
+        <input class="nb-name" id="nb-name" type="text" placeholder="可匿名" maxlength="20" />
+        <label style="font-size:11px;margin-bottom:2px;margin-top:4px;">留言内容：</label>
+        <textarea class="nb-text" id="nb-text" placeholder="留下你的留言吧..." maxlength="200" rows="3"></textarea>
         <button class="nb-send" id="nb-send">发送留言</button>
       </div>
+    </div>
+    <div class="win-statusbar">
+      <div class="statusbar-pane">就绪</div>
+      <div class="statusbar-pane" style="margin-left:auto;">Tenny's Station</div>
     </div>
   </template>
 
   <!-- About -->
   <template id="tpl-about">
+    <div class="win-menubar">
+      <span>文件(F)</span><span>帮助(H)</span>
+    </div>
     <div class="win-body about-body">
       <div class="about-avatar">👩‍💻</div>
       <h2 class="about-name">Tenny Shen</h2>
@@ -105,48 +112,62 @@
         <div class="astat"><div class="astat-num">∞</div><div class="astat-label">杯咖啡</div></div>
       </div>
     </div>
+    <div class="win-statusbar">
+      <div class="statusbar-pane">属性</div>
+    </div>
   </template>
 
   <!-- Projects -->
   <template id="tpl-projects">
+    <div class="win-menubar">
+      <span>文件(F)</span><span>视图(V)</span><span>帮助(H)</span>
+    </div>
     <div class="win-body projects-body">
-      <div class="proj-card">
-        <div class="proj-icon" style="background:linear-gradient(135deg,#667eea,#764ba2)">🤖</div>
-        <div class="proj-info">
-          <div class="proj-title">AI 工具地图</div>
-          <div class="proj-desc">收录 200+ AI 工具的导航网站，按类型分类，每周更新</div>
-          <div class="proj-tags"><span class="ptag">Next.js</span><span class="ptag">Notion API</span></div>
+      <div class="proj-list-wrap">
+        <div class="proj-card">
+          <div class="proj-icon">🤖</div>
+          <div class="proj-info">
+            <div class="proj-title">AI 工具地图</div>
+            <div class="proj-desc">收录 200+ AI 工具的导航网站，按类型分类，每周更新</div>
+            <div class="proj-tags"><span class="ptag">Next.js</span><span class="ptag">Notion API</span></div>
+          </div>
+        </div>
+        <div class="proj-card">
+          <div class="proj-icon">📊</div>
+          <div class="proj-info">
+            <div class="proj-title">AI Investor</div>
+            <div class="proj-desc">AI 驱动的股票分析工具，自动生成投资报告</div>
+            <div class="proj-tags"><span class="ptag">Python</span><span class="ptag">OpenAI</span></div>
+          </div>
+        </div>
+        <div class="proj-card">
+          <div class="proj-icon">✍️</div>
+          <div class="proj-info">
+            <div class="proj-title">PostGen</div>
+            <div class="proj-desc">30 天社群贴文生成器，支持多平台格式</div>
+            <div class="proj-tags"><span class="ptag">Gemini AI</span><span class="ptag">Web App</span></div>
+          </div>
+        </div>
+        <div class="proj-card">
+          <div class="proj-icon">📋</div>
+          <div class="proj-info">
+            <div class="proj-title">WorkRecord</div>
+            <div class="proj-desc">工作记录与时间追踪工具，帮助提升工作效率</div>
+            <div class="proj-tags"><span class="ptag">Vue.js</span><span class="ptag">Firebase</span></div>
+          </div>
         </div>
       </div>
-      <div class="proj-card">
-        <div class="proj-icon" style="background:linear-gradient(135deg,#f093fb,#f5576c)">📊</div>
-        <div class="proj-info">
-          <div class="proj-title">AI Investor</div>
-          <div class="proj-desc">AI 驱动的股票分析工具，自动生成投资报告</div>
-          <div class="proj-tags"><span class="ptag">Python</span><span class="ptag">OpenAI</span></div>
-        </div>
-      </div>
-      <div class="proj-card">
-        <div class="proj-icon" style="background:linear-gradient(135deg,#4facfe,#00f2fe)">✍️</div>
-        <div class="proj-info">
-          <div class="proj-title">PostGen</div>
-          <div class="proj-desc">30 天社群贴文生成器，支持多平台格式</div>
-          <div class="proj-tags"><span class="ptag">Gemini AI</span><span class="ptag">Web App</span></div>
-        </div>
-      </div>
-      <div class="proj-card">
-        <div class="proj-icon" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">📋</div>
-        <div class="proj-info">
-          <div class="proj-title">WorkRecord</div>
-          <div class="proj-desc">工作记录与时间追踪工具，帮助提升工作效率</div>
-          <div class="proj-tags"><span class="ptag">Vue.js</span><span class="ptag">Firebase</span></div>
-        </div>
-      </div>
+    </div>
+    <div class="win-statusbar">
+      <div class="statusbar-pane">4 个对象</div>
     </div>
   </template>
 
   <!-- Contact -->
   <template id="tpl-contact">
+    <div class="win-menubar">
+      <span>文件(F)</span><span>帮助(H)</span>
+    </div>
     <div class="win-body contact-body">
       <div class="contact-avatar">✉️</div>
       <h2 class="contact-title">来打个招呼吧！</h2>
@@ -157,14 +178,17 @@
           <span>tenny1215@gmail.com</span>
         </a>
         <a class="clink github" href="https://github.com/tenny1215-tech" target="_blank">
-          <span class="clink-icon">⌥</span>
+          <span class="clink-icon">🖥️</span>
           <span>github.com/tenny1215-tech</span>
         </a>
         <a class="clink twitter" href="#" target="_blank">
-          <span class="clink-icon">𝕏</span>
+          <span class="clink-icon">🐦</span>
           <span>@tenny_dev</span>
         </a>
       </div>
+    </div>
+    <div class="win-statusbar">
+      <div class="statusbar-pane">3 个联系方式</div>
     </div>
   </template>
 
