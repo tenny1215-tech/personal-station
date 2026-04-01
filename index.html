@@ -3,278 +3,171 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DevOS Portfolio</title>
+  <title>Tenny's Station</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div id="os">
-
-    <!-- Title Bar -->
-    <div class="titlebar">
-      <div class="dots">
-        <span class="dot red"></span>
-        <span class="dot yellow"></span>
-        <span class="dot green"></span>
-      </div>
-      <div class="title-text">DEVOS v2.4.1 — portfolio.sh</div>
-      <div class="title-right" id="clock"></div>
+  <!-- MENU BAR -->
+  <div id="menubar">
+    <span class="menu-logo">⬛ TENNY'S STATION</span>
+    <div class="menu-links">
+      <span>文件</span>
+      <span>编辑</span>
+      <span>视图</span>
     </div>
-
-    <!-- Body -->
-    <div class="os-body">
-
-      <!-- Sidebar -->
-      <nav class="sidebar">
-        <div class="sidebar-section">/ filesystem</div>
-        <div class="nav-item active" data-panel="home">
-          <span class="nav-icon">~</span> home
-        </div>
-        <div class="nav-item" data-panel="about">
-          <span class="nav-icon">▸</span> about.md
-        </div>
-        <div class="nav-item" data-panel="projects">
-          <span class="nav-icon">▸</span> projects/
-        </div>
-        <div class="nav-item" data-panel="skills">
-          <span class="nav-icon">▸</span> skills.json
-        </div>
-        <div class="nav-item" data-panel="contact">
-          <span class="nav-icon">▸</span> contact.sh
-        </div>
-        <div class="sidebar-section sidebar-bottom">/ system</div>
-        <div class="nav-item status-item">
-          <span class="nav-icon pulse-dot"></span> online
-        </div>
-      </nav>
-
-      <!-- Main Content -->
-      <main class="main-content">
-
-        <!-- HOME -->
-        <section class="panel active" id="p-home">
-          <div class="prompt-line">
-            <span class="prompt">~/portfolio $</span>
-            <span class="cmd">cat welcome.txt</span>
-          </div>
-          <div class="output-block">
-            <h1 class="big-name" id="typed-name"></h1>
-            <p class="subtitle">Full-Stack Engineer &amp; Creative Developer</p>
-            <div class="tags">
-              <span class="tag">TypeScript</span>
-              <span class="tag">React</span>
-              <span class="tag">Node.js</span>
-              <span class="tag cyan">open to work</span>
-              <span class="tag amber">Remote</span>
-            </div>
-          </div>
-          <hr class="divider" />
-          <div class="prompt-line">
-            <span class="prompt">~/portfolio $</span>
-            <span class="cmd">uptime</span>
-          </div>
-          <div class="stat-grid">
-            <div class="stat">
-              <div class="stat-num">4+</div>
-              <div class="stat-label">YEARS EXP</div>
-            </div>
-            <div class="stat">
-              <div class="stat-num">23</div>
-              <div class="stat-label">PROJECTS</div>
-            </div>
-            <div class="stat">
-              <div class="stat-num">∞</div>
-              <div class="stat-label">COFFEE</div>
-            </div>
-          </div>
-          <hr class="divider" />
-          <div class="prompt-line">
-            <span class="prompt">~/portfolio $</span>
-            <span class="cmd">ls -la</span>
-          </div>
-          <div class="ls-output">
-            <div><span class="ls-perm">drwxr-xr-x</span> about.md</div>
-            <div><span class="ls-perm">drwxr-xr-x</span> projects/</div>
-            <div><span class="ls-perm">-rw-r--r--</span> skills.json</div>
-            <div><span class="ls-perm">-rwxr-xr-x</span> contact.sh</div>
-          </div>
-          <div class="input-line">
-            <span class="prompt">~/portfolio $</span>
-            <span class="cursor blink"></span>
-          </div>
-        </section>
-
-        <!-- ABOUT -->
-        <section class="panel" id="p-about">
-          <div class="prompt-line">
-            <span class="prompt">~/portfolio $</span>
-            <span class="cmd">cat about.md</span>
-          </div>
-          <div class="output-block">
-            <div class="section-title"># whoami</div>
-            <p class="bio-text">
-              Hi! I'm a full-stack developer who loves building fast, beautiful, and functional web products.
-              I care deeply about developer experience, clean architecture, and shipping things that actually work.
-            </p>
-            <div class="section-title"># experience</div>
-            <div class="card">
-              <div class="card-title">Senior Frontend Engineer @ Acme Corp</div>
-              <div class="card-meta">2022 — PRESENT · REMOTE</div>
-              <div class="card-desc">Led migration from CRA to Next.js 13, reducing bundle size by 40%. Built design system adopted by 5 product teams.</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Full-Stack Developer @ Startup XYZ</div>
-              <div class="card-meta">2020 — 2022 · REMOTE</div>
-              <div class="card-desc">Built real-time collaboration features using WebSockets. Designed REST + GraphQL APIs serving 50k+ users.</div>
-            </div>
-            <div class="section-title"># education</div>
-            <div class="card">
-              <div class="card-title">B.Sc. Computer Science</div>
-              <div class="card-meta">FUDAN UNIVERSITY · 2016 — 2020</div>
-            </div>
-          </div>
-        </section>
-
-        <!-- PROJECTS -->
-        <section class="panel" id="p-projects">
-          <div class="prompt-line">
-            <span class="prompt">~/portfolio/projects $</span>
-            <span class="cmd">ls -la</span>
-          </div>
-          <div class="output-block">
-            <div class="section-title"># featured projects</div>
-            <div class="card">
-              <div class="card-title">▸ CodeReview AI</div>
-              <div class="card-meta">TYPESCRIPT · NEXT.JS · OPENAI API</div>
-              <div class="card-desc">An AI-powered code review tool that analyzes PRs and provides detailed feedback on performance, security, and style.</div>
-              <div class="card-tags">
-                <span class="tag">Next.js</span>
-                <span class="tag">OpenAI</span>
-                <span class="tag cyan">★ 420</span>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-title">▸ DevOS Portfolio</div>
-              <div class="card-meta">HTML · CSS · VANILLA JS · CLOUDFLARE PAGES</div>
-              <div class="card-desc">Terminal-style developer portfolio simulating an OS environment. Zero dependencies, 100 Lighthouse score.</div>
-              <div class="card-tags">
-                <span class="tag">Vanilla JS</span>
-                <span class="tag">CSS</span>
-                <span class="tag amber">open source</span>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-title">▸ Realtime Collab SDK</div>
-              <div class="card-meta">NODE.JS · WEBSOCKET · REDIS</div>
-              <div class="card-desc">Lightweight SDK for adding real-time collaboration (cursors, selections, presence) to any web app.</div>
-              <div class="card-tags">
-                <span class="tag">Node.js</span>
-                <span class="tag">WebSocket</span>
-                <span class="tag cyan">★ 890</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- SKILLS -->
-        <section class="panel" id="p-skills">
-          <div class="prompt-line">
-            <span class="prompt">~/portfolio $</span>
-            <span class="cmd">cat skills.json | jq .</span>
-          </div>
-          <div class="output-block">
-            <div class="section-title"># frontend</div>
-            <div class="skill-row">
-              <span class="skill-name">TypeScript</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="95"></div></div>
-              <span class="skill-pct">95%</span>
-            </div>
-            <div class="skill-row">
-              <span class="skill-name">React / Next.js</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="90"></div></div>
-              <span class="skill-pct">90%</span>
-            </div>
-            <div class="skill-row">
-              <span class="skill-name">CSS / Tailwind</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="88"></div></div>
-              <span class="skill-pct">88%</span>
-            </div>
-            <div class="section-title mt16"># backend</div>
-            <div class="skill-row">
-              <span class="skill-name">Node.js</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="85"></div></div>
-              <span class="skill-pct">85%</span>
-            </div>
-            <div class="skill-row">
-              <span class="skill-name">PostgreSQL</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="75"></div></div>
-              <span class="skill-pct">75%</span>
-            </div>
-            <div class="skill-row">
-              <span class="skill-name">Redis</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="70"></div></div>
-              <span class="skill-pct">70%</span>
-            </div>
-            <div class="section-title mt16"># devops</div>
-            <div class="skill-row">
-              <span class="skill-name">Docker</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="80"></div></div>
-              <span class="skill-pct">80%</span>
-            </div>
-            <div class="skill-row">
-              <span class="skill-name">CI/CD</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="75"></div></div>
-              <span class="skill-pct">75%</span>
-            </div>
-            <div class="skill-row">
-              <span class="skill-name">AWS / CF</span>
-              <div class="skill-bar-bg"><div class="skill-bar" data-width="70"></div></div>
-              <span class="skill-pct">70%</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- CONTACT -->
-        <section class="panel" id="p-contact">
-          <div class="prompt-line">
-            <span class="prompt">~/portfolio $</span>
-            <span class="cmd">./contact.sh</span>
-          </div>
-          <div class="output-block">
-            <div class="section-title"># get in touch</div>
-            <p class="bio-text">
-              Open to freelance projects, full-time roles, and interesting conversations. Response time: ~24h.
-            </p>
-            <div class="link-row">
-              <a class="link-btn" href="mailto:you@email.com">✉ Email</a>
-              <a class="link-btn" href="https://github.com/" target="_blank">⌥ GitHub</a>
-              <a class="link-btn" href="https://linkedin.com/" target="_blank">☍ LinkedIn</a>
-            </div>
-          </div>
-          <hr class="divider" />
-          <div class="prompt-line">
-            <span class="prompt">~/portfolio $</span>
-            <span class="cmd">ping you@email.com</span>
-          </div>
-          <div class="ping-output">
-            <div>PING you@email.com: 56 bytes of data</div>
-            <div class="ping-ok">64 bytes: seq=0 time=1.23 ms</div>
-            <div class="ping-ok">64 bytes: seq=1 time=0.98 ms</div>
-            <div class="ping-dim">^C --- 2 packets, 0% loss ---</div>
-          </div>
-          <div class="input-line">
-            <span class="prompt">~/portfolio $</span>
-            <input class="term-input" id="termInput" type="text" placeholder="type a command... (try: help)" autocomplete="off" spellcheck="false" />
-          </div>
-          <div id="term-output"></div>
-        </section>
-
-      </main>
+    <div class="menu-right">
+      <span id="menuClock"></span>
     </div>
   </div>
 
-  <script src="main.js"></script>
+  <!-- DESKTOP -->
+  <div id="desktop">
+
+    <!-- Desktop Icons -->
+    <div class="desktop-icons">
+      <div class="icon" data-app="notebook">
+        <div class="icon-img" style="background:linear-gradient(145deg,#f9c74f,#f3722c)">📓</div>
+        <span>留言板</span>
+      </div>
+      <div class="icon" data-app="about">
+        <div class="icon-img" style="background:linear-gradient(145deg,#4cc9f0,#4361ee)">👤</div>
+        <span>关于我</span>
+      </div>
+      <div class="icon" data-app="projects">
+        <div class="icon-img" style="background:linear-gradient(145deg,#7209b7,#560bad)">💼</div>
+        <span>项目</span>
+      </div>
+      <div class="icon" data-app="contact">
+        <div class="icon-img" style="background:linear-gradient(145deg,#f72585,#b5179e)">✉️</div>
+        <span>联系我</span>
+      </div>
+    </div>
+
+    <!-- Windows Container -->
+    <div id="windows"></div>
+
+  </div>
+
+  <!-- DOCK -->
+  <div id="dock">
+    <div class="dock-item" data-app="notebook" title="留言板">
+      <div class="dock-icon" style="background:linear-gradient(145deg,#f9c74f,#f3722c)">📓</div>
+    </div>
+    <div class="dock-item" data-app="about" title="关于我">
+      <div class="dock-icon" style="background:linear-gradient(145deg,#4cc9f0,#4361ee)">👤</div>
+    </div>
+    <div class="dock-item" data-app="projects" title="项目">
+      <div class="dock-icon" style="background:linear-gradient(145deg,#7209b7,#560bad)">💼</div>
+    </div>
+    <div class="dock-item" data-app="contact" title="联系我">
+      <div class="dock-icon" style="background:linear-gradient(145deg,#f72585,#b5179e)">✉️</div>
+    </div>
+  </div>
+
+  <!-- WINDOW TEMPLATES -->
+
+  <!-- Notebook / Guestbook -->
+  <template id="tpl-notebook">
+    <div class="win-body notebook-body">
+      <div class="nb-messages" id="nb-messages">
+        <div class="nb-loading">加载留言中...</div>
+      </div>
+      <div class="nb-form">
+        <input class="nb-name" id="nb-name" type="text" placeholder="你的名字（可匿名）" maxlength="20" />
+        <textarea class="nb-text" id="nb-text" placeholder="留下你的留言吧 ✨" maxlength="200" rows="3"></textarea>
+        <button class="nb-send" id="nb-send">发送留言</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- About -->
+  <template id="tpl-about">
+    <div class="win-body about-body">
+      <div class="about-avatar">👩‍💻</div>
+      <h2 class="about-name">Tenny Shen</h2>
+      <p class="about-role">Full-Stack Developer · Paris 🇫🇷</p>
+      <div class="about-tags">
+        <span class="atag">React</span>
+        <span class="atag">Node.js</span>
+        <span class="atag">Firebase</span>
+        <span class="atag">TypeScript</span>
+      </div>
+      <p class="about-bio">
+        热爱构建有趣的 Web 产品。喜欢探索 AI 工具、设计系统和开源项目。
+        目前在巴黎工作，欢迎来聊 🙌
+      </p>
+      <div class="about-stats">
+        <div class="astat"><div class="astat-num">3+</div><div class="astat-label">年经验</div></div>
+        <div class="astat"><div class="astat-num">12</div><div class="astat-label">个项目</div></div>
+        <div class="astat"><div class="astat-num">∞</div><div class="astat-label">杯咖啡</div></div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Projects -->
+  <template id="tpl-projects">
+    <div class="win-body projects-body">
+      <div class="proj-card">
+        <div class="proj-icon" style="background:linear-gradient(135deg,#667eea,#764ba2)">🤖</div>
+        <div class="proj-info">
+          <div class="proj-title">AI 工具地图</div>
+          <div class="proj-desc">收录 200+ AI 工具的导航网站，按类型分类，每周更新</div>
+          <div class="proj-tags"><span class="ptag">Next.js</span><span class="ptag">Notion API</span></div>
+        </div>
+      </div>
+      <div class="proj-card">
+        <div class="proj-icon" style="background:linear-gradient(135deg,#f093fb,#f5576c)">📊</div>
+        <div class="proj-info">
+          <div class="proj-title">AI Investor</div>
+          <div class="proj-desc">AI 驱动的股票分析工具，自动生成投资报告</div>
+          <div class="proj-tags"><span class="ptag">Python</span><span class="ptag">OpenAI</span></div>
+        </div>
+      </div>
+      <div class="proj-card">
+        <div class="proj-icon" style="background:linear-gradient(135deg,#4facfe,#00f2fe)">✍️</div>
+        <div class="proj-info">
+          <div class="proj-title">PostGen</div>
+          <div class="proj-desc">30 天社群贴文生成器，支持多平台格式</div>
+          <div class="proj-tags"><span class="ptag">Gemini AI</span><span class="ptag">Web App</span></div>
+        </div>
+      </div>
+      <div class="proj-card">
+        <div class="proj-icon" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">📋</div>
+        <div class="proj-info">
+          <div class="proj-title">WorkRecord</div>
+          <div class="proj-desc">工作记录与时间追踪工具，帮助提升工作效率</div>
+          <div class="proj-tags"><span class="ptag">Vue.js</span><span class="ptag">Firebase</span></div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Contact -->
+  <template id="tpl-contact">
+    <div class="win-body contact-body">
+      <div class="contact-avatar">✉️</div>
+      <h2 class="contact-title">来打个招呼吧！</h2>
+      <p class="contact-sub">我通常在 24 小时内回复</p>
+      <div class="contact-links">
+        <a class="clink email" href="mailto:tenny1215@gmail.com">
+          <span class="clink-icon">📧</span>
+          <span>tenny1215@gmail.com</span>
+        </a>
+        <a class="clink github" href="https://github.com/tenny1215-tech" target="_blank">
+          <span class="clink-icon">⌥</span>
+          <span>github.com/tenny1215-tech</span>
+        </a>
+        <a class="clink twitter" href="#" target="_blank">
+          <span class="clink-icon">𝕏</span>
+          <span>@tenny_dev</span>
+        </a>
+      </div>
+    </div>
+  </template>
+
+  <script type="module" src="main.js"></script>
 </body>
 </html>
