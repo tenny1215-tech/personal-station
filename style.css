@@ -16,10 +16,7 @@ body {
   position: fixed;
   inset: 28px 0 80px 0;
   background:
-    radial-gradient(ellipse at 20% 50%, rgba(120,40,200,0.5) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(255,120,50,0.45) 0%, transparent 55%),
-    radial-gradient(ellipse at 60% 80%, rgba(20,180,220,0.4) 0%, transparent 55%),
-    linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+   background: url('wallpaper.jpg') center/cover no-repeat;
   overflow: hidden;
 }
 
