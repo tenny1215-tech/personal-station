@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, deleteDoc, doc,
+  getFirestore, collection, addDoc, deleteDoc, doc, getDoc,
   onSnapshot, orderBy, query, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -13,298 +13,286 @@ const firebaseConfig = {
   messagingSenderId: "16967737691",
   appId: "1:16967737691:web:53834006c3a385a7b63a7e"
 };
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+const db = getFirestore(initializeApp(firebaseConfig));
 
-// ===== STICKY COLORS =====
+// ===== COLORS =====
 const COLORS = [
-  '#fef08a', // yellow
-  '#bbf7d0', // green
-  '#bfdbfe', // blue
-  '#fecaca', // red
-  '#e9d5ff', // purple
-  '#fed7aa', // orange
-  '#fbcfe8', // pink
-  '#a5f3fc', // cyan
+  '#fef08a', '#bbf7d0', '#bfdbfe', '#fecaca',
+  '#e9d5ff', '#fed7aa', '#fbcfe8', '#a5f3fc',
+  '#d9f99d', '#fde68a',
 ];
 
-// ===== APP CONFIG =====
-const appConfig = {
-  notebook: { title: '📌 留言板', tpl: 'tpl-notebook', w: 680, h: 460 },
-  about:    { title: '👤 关于我', tpl: 'tpl-about',    w: 360, h: 420 },
-  projects: { title: '💼 我的项目',tpl: 'tpl-projects', w: 440, h: 480 },
-  contact:  { title: '✉️ 联系我', tpl: 'tpl-contact',  w: 360, h: 340 },
-};
+// ===== CANVAS STATE =====
+const canvas    = document.getElementById('canvas');
+const wrap      = document.getElementById('canvas-wrap');
+let scale       = 1;
+let panX        = 0;
+let panY        = 0;
+let isPanning   = false;
+let panStartX   = 0;
+let panStartY   = 0;
+const NOTE_W    = 180;
+const NOTE_H    = 100; // approx
+const PADDING   = 24;
 
-let zTop = 100;
-const openWindows = {};
+// ===== GRID LAYOUT ENGINE =====
+// Keeps track of placed note positions to avoid overlap
+const placedRects = [];
 
-// ===== CLOCK =====
-function tick() {
-  const el = document.getElementById('menuClock');
-  if (el) el.textContent = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-}
-tick();
-setInterval(tick, 10000);
+function findPosition() {
+  // canvas visible center
+  const vw = wrap.clientWidth;
+  const vh = wrap.clientHeight;
 
-// ===== OPEN APP =====
-function openApp(appId) {
-  if (openWindows[appId]) { focusWin(openWindows[appId]); return; }
-  const cfg = appConfig[appId];
-  if (!cfg) return;
-  const tpl = document.getElementById(cfg.tpl);
-  if (!tpl) return;
+  // spiral outward from center until we find a free spot
+  const cx = (vw / 2 - panX) / scale;
+  const cy = (vh / 2 - panY) / scale;
 
-  const win = document.createElement('div');
-  win.className = 'window';
-  win.style.width  = cfg.w + 'px';
-  win.style.height = cfg.h + 'px';
-  win.style.zIndex = ++zTop;
-
-  const dw = window.innerWidth, dh = window.innerHeight - 108;
-  win.style.left = Math.max(20, (dw - cfg.w) / 2 + (Math.random() - .5) * 120) + 'px';
-  win.style.top  = Math.max(10, (dh - cfg.h) / 2 + (Math.random() - .5) * 80) + 'px';
-
-  const tb = document.createElement('div');
-  tb.className = 'win-titlebar';
-  tb.innerHTML = `
-    <div class="win-dots">
-      <div class="win-dot red"    data-action="close"></div>
-      <div class="win-dot yellow"></div>
-      <div class="win-dot green"></div>
-    </div>
-    <div class="win-title">${cfg.title}</div>`;
-
-  win.appendChild(tb);
-  win.appendChild(tpl.content.cloneNode(true));
-  document.getElementById('windows').appendChild(win);
-  openWindows[appId] = win;
-
-  const dockItem = document.querySelector(`.dock-item[data-app="${appId}"]`);
-  if (dockItem) dockItem.classList.add('open');
-
-  tb.querySelector('[data-action="close"]').addEventListener('click', () => closeApp(appId));
-  win.addEventListener('mousedown', () => focusWin(win));
-  makeDraggable(win, tb);
-
-  if (appId === 'notebook') initBoard(win);
-}
-
-function closeApp(appId) {
-  const win = openWindows[appId];
-  if (!win) return;
-  win.style.animation = 'winClose .15s ease forwards';
-  win.addEventListener('animationend', () => win.remove(), { once: true });
-  delete openWindows[appId];
-  const d = document.querySelector(`.dock-item[data-app="${appId}"]`);
-  if (d) d.classList.remove('open');
-}
-
-function focusWin(win) { win.style.zIndex = ++zTop; }
-
-// ===== DRAG WINDOWS =====
-function makeDraggable(win, handle) {
-  let dragging = false, ox = 0, oy = 0;
-  handle.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('win-dot')) return;
-    dragging = true;
-    ox = e.clientX - win.offsetLeft;
-    oy = e.clientY - win.offsetTop;
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    win.style.left = Math.max(0, Math.min(window.innerWidth  - win.offsetWidth,  e.clientX - ox)) + 'px';
-    win.style.top  = Math.max(0, Math.min(window.innerHeight - win.offsetHeight, e.clientY - oy)) + 'px';
-  });
-  document.addEventListener('mouseup', () => { dragging = false; });
-}
-
-// ===== BOARD =====
-let pendingDelete = null; // { docId, deleteCode }
-
-function initBoard(win) {
-  const boardArea = win.querySelector('#board-area');
-  const boardEmpty = win.querySelector('#board-empty');
-  const nameInput  = win.querySelector('#form-name');
-  const textInput  = win.querySelector('#form-text');
-  const sendBtn    = win.querySelector('#form-send');
-
-  // random bg color for the form sticky
-  const formSticky = win.querySelector('.form-sticky');
-  formSticky.style.background = COLORS[Math.floor(Math.random() * COLORS.length)];
-
-  // listen Firestore
-  const q = query(collection(db, 'messages'), orderBy('createdAt', 'asc'));
-  const unsub = onSnapshot(q, snapshot => {
-    // clear existing stickies
-    boardArea.querySelectorAll('.sticky').forEach(s => s.remove());
-    if (snapshot.empty) {
-      if (boardEmpty) boardEmpty.style.display = 'block';
-      return;
+  const step = NOTE_W + PADDING;
+  for (let ring = 0; ring < 30; ring++) {
+    const positions = [];
+    if (ring === 0) {
+      positions.push({ x: cx - NOTE_W / 2, y: cy - NOTE_H / 2 });
+    } else {
+      for (let col = -ring; col <= ring; col++) {
+        positions.push({ x: cx + col * step - NOTE_W / 2, y: cy - ring * (NOTE_H + PADDING) - NOTE_H / 2 });
+        positions.push({ x: cx + col * step - NOTE_W / 2, y: cy + ring * (NOTE_H + PADDING) - NOTE_H / 2 });
+      }
+      for (let row = -ring + 1; row <= ring - 1; row++) {
+        positions.push({ x: cx - ring * step - NOTE_W / 2, y: cy + row * (NOTE_H + PADDING) - NOTE_H / 2 });
+        positions.push({ x: cx + ring * step - NOTE_W / 2, y: cy + row * (NOTE_H + PADDING) - NOTE_H / 2 });
+      }
     }
-    if (boardEmpty) boardEmpty.style.display = 'none';
-
-    snapshot.forEach(docSnap => {
-      const d = docSnap.data();
-      addStickyToBoard(boardArea, docSnap.id, d);
-    });
-  });
-
-  // send
-  sendBtn.addEventListener('click', async () => {
-    const name = nameInput.value.trim() || '匿名';
-    const text = textInput.value.trim();
-    if (!text) { textInput.focus(); return; }
-
-    sendBtn.disabled = true;
-    sendBtn.textContent = '贴中...';
-
-    // generate 6-digit delete code
-    const deleteCode = String(Math.floor(100000 + Math.random() * 900000));
-    const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-
-    // random position in board area
-    const bw = boardArea.offsetWidth  || 460;
-    const bh = boardArea.offsetHeight || 400;
-    const px = Math.random() * (bw - 170) + 10;
-    const py = Math.random() * (bh - 160) + 10;
-    const rot = (Math.random() - 0.5) * 10;
-
-    try {
-      await addDoc(collection(db, 'messages'), {
-        name, text, color, deleteCode,
-        x: px, y: py, rot,
-        createdAt: serverTimestamp(),
-        expiresAt: Date.now() + 3600000
-      });
-      nameInput.value = '';
-      textInput.value = '';
-      showCodeToast(deleteCode);
-    } catch (err) {
-      alert('发送失败，请重试');
-      console.error(err);
+    for (const pos of positions) {
+      if (!overlaps(pos.x, pos.y)) {
+        placedRects.push({ x: pos.x, y: pos.y, w: NOTE_W, h: NOTE_H + PADDING });
+        return pos;
+      }
     }
-
-    sendBtn.disabled = false;
-    sendBtn.textContent = '📌 贴上去！';
-  });
+  }
+  // fallback
+  const fb = { x: cx + Math.random() * 200 - 100, y: cy + Math.random() * 200 - 100 };
+  placedRects.push({ x: fb.x, y: fb.y, w: NOTE_W, h: NOTE_H + PADDING });
+  return fb;
 }
 
-function addStickyToBoard(boardArea, docId, data) {
-  const sticky = document.createElement('div');
-  sticky.className = 'sticky';
-  sticky.dataset.id = docId;
-  sticky.style.background = data.color || COLORS[0];
-  sticky.style.left = (data.x || 20) + 'px';
-  sticky.style.top  = (data.y || 20) + 'px';
-  sticky.style.zIndex = 10;
-  sticky.style.setProperty('--r', (data.rot || 0) + 'deg');
-  sticky.style.transform = `rotate(${data.rot || 0}deg)`;
+function overlaps(x, y) {
+  for (const r of placedRects) {
+    if (
+      x < r.x + r.w + PADDING &&
+      x + NOTE_W + PADDING > r.x &&
+      y < r.y + r.h + PADDING &&
+      y + NOTE_H + PADDING > r.y
+    ) return true;
+  }
+  return false;
+}
+
+// ===== APPLY TRANSFORM =====
+function applyTransform() {
+  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+  document.getElementById('zoom-label').textContent = Math.round(scale * 100) + '%';
+}
+
+// ===== ZOOM =====
+function zoomTo(newScale, cx, cy) {
+  const clampedScale = Math.min(2, Math.max(0.2, newScale));
+  const ratio = clampedScale / scale;
+  panX = cx - ratio * (cx - panX);
+  panY = cy - ratio * (cy - panY);
+  scale = clampedScale;
+  applyTransform();
+}
+
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = wrap.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  zoomTo(scale * delta, cx, cy);
+}, { passive: false });
+
+document.getElementById('zoom-in').addEventListener('click',  () => zoomTo(scale * 1.2, wrap.clientWidth/2, wrap.clientHeight/2));
+document.getElementById('zoom-out').addEventListener('click', () => zoomTo(scale * 0.8, wrap.clientWidth/2, wrap.clientHeight/2));
+document.getElementById('zoom-reset').addEventListener('click', () => {
+  scale = 1; panX = 0; panY = 0; applyTransform();
+});
+
+// ===== PAN =====
+wrap.addEventListener('mousedown', e => {
+  if (e.target !== wrap && e.target !== canvas && !e.target.matches('svg, rect')) return;
+  isPanning = true;
+  panStartX = e.clientX - panX;
+  panStartY = e.clientY - panY;
+  wrap.classList.add('grabbing');
+});
+
+document.addEventListener('mousemove', e => {
+  if (!isPanning) return;
+  panX = e.clientX - panStartX;
+  panY = e.clientY - panStartY;
+  applyTransform();
+});
+
+document.addEventListener('mouseup', () => {
+  isPanning = false;
+  wrap.classList.remove('grabbing');
+});
+
+// ===== RENDER NOTES =====
+const noteEls = {}; // docId -> element
+
+function renderNote(docId, data, isNew = false) {
+  if (noteEls[docId]) return; // already rendered
+
+  const el = document.createElement('div');
+  el.className = 'sticky';
+  el.dataset.id = docId;
+
+  const color = data.color || COLORS[0];
+  el.style.background = color;
+  el.style.left = (data.x || 0) + 'px';
+  el.style.top  = (data.y || 0) + 'px';
+  el.style.zIndex = data.z || 1;
 
   const time = data.createdAt?.toDate
-    ? data.createdAt.toDate().toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    ? data.createdAt.toDate().toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })
     : '刚刚';
 
-  // check if within 1hr
   const canDelete = !data.expiresAt || Date.now() < data.expiresAt;
 
-  sticky.innerHTML = `
-    <div class="sticky-pin">📌</div>
+  el.innerHTML = `
     <div class="sticky-name">${escHtml(data.name || '匿名')}</div>
     <div class="sticky-text">${escHtml(data.text)}</div>
-    <div class="sticky-time">${time}</div>
-    ${canDelete ? `<button class="sticky-del" title="删除">🗑</button>` : ''}
+    <div class="sticky-footer">
+      <span class="sticky-time">${time}</span>
+      ${canDelete ? `<button class="sticky-del" title="删除">🗑</button>` : ''}
+    </div>
   `;
 
-  // drag sticky within board
-  makeStickyDraggable(sticky, boardArea, docId);
+  if (isNew) el.style.animation = 'stickyIn .3s cubic-bezier(.34,1.56,.64,1)';
 
   if (canDelete) {
-    sticky.querySelector('.sticky-del').addEventListener('click', e => {
+    el.querySelector('.sticky-del').addEventListener('click', e => {
       e.stopPropagation();
       openDeleteModal(docId);
     });
   }
 
-  boardArea.appendChild(sticky);
+  canvas.appendChild(el);
+  noteEls[docId] = el;
 }
 
-// drag stickies
-function makeStickyDraggable(sticky, container, docId) {
-  let dragging = false, ox = 0, oy = 0;
-  sticky.addEventListener('mousedown', e => {
-    if (e.target.classList.contains('sticky-del')) return;
-    dragging = true;
-    ox = e.clientX - sticky.offsetLeft;
-    oy = e.clientY - sticky.offsetTop;
-    sticky.style.zIndex = ++zTop;
-    e.preventDefault();
+// ===== FIRESTORE LISTENER =====
+let totalNotes = 0;
+const q = query(collection(db, 'messages'), orderBy('createdAt', 'asc'));
+
+onSnapshot(q, snapshot => {
+  // add new notes
+  snapshot.docChanges().forEach(change => {
+    if (change.type === 'added') {
+      renderNote(change.doc.id, change.doc.data(), true);
+    }
+    if (change.type === 'removed') {
+      const el = noteEls[change.doc.id];
+      if (el) {
+        el.style.transition = 'transform .2s, opacity .2s';
+        el.style.transform = 'scale(0.7)';
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 220);
+        delete noteEls[change.doc.id];
+        // remove from placedRects
+        const d = change.doc.data();
+        const idx = placedRects.findIndex(r => Math.abs(r.x - d.x) < 2 && Math.abs(r.y - d.y) < 2);
+        if (idx !== -1) placedRects.splice(idx, 1);
+      }
+    }
   });
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    const cw = container.offsetWidth  - sticky.offsetWidth;
-    const ch = container.offsetHeight - sticky.offsetHeight;
-    sticky.style.left = Math.max(0, Math.min(cw, e.clientX - ox)) + 'px';
-    sticky.style.top  = Math.max(0, Math.min(ch, e.clientY - oy)) + 'px';
-  });
-  document.addEventListener('mouseup', () => { dragging = false; });
+
+  totalNotes = Object.keys(noteEls).length;
+  document.getElementById('note-count').textContent = totalNotes + ' 条留言';
+});
+
+// ===== SEND NOTE =====
+const sendBtn  = document.getElementById('inp-send');
+const nameInp  = document.getElementById('inp-name');
+const textInp  = document.getElementById('inp-text');
+
+async function sendNote() {
+  const name = nameInp.value.trim() || '匿名';
+  const text = textInp.value.trim();
+  if (!text) { textInp.focus(); return; }
+
+  sendBtn.disabled = true;
+  sendBtn.textContent = '发送中...';
+
+  const deleteCode = String(Math.floor(100000 + Math.random() * 900000));
+  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const pos = findPosition();
+  const zVal = Date.now() % 100;
+
+  try {
+    await addDoc(collection(db, 'messages'), {
+      name, text, color,
+      x: pos.x, y: pos.y, z: zVal,
+      deleteCode,
+      createdAt: serverTimestamp(),
+      expiresAt: Date.now() + 3600000,
+    });
+    nameInp.value = '';
+    textInp.value = '';
+    showCodeToast(deleteCode);
+
+    // pan to new note
+    const vw = wrap.clientWidth, vh = wrap.clientHeight;
+    panX = vw / 2 - (pos.x + NOTE_W / 2) * scale;
+    panY = vh / 2 - (pos.y + NOTE_H / 2) * scale;
+    applyTransform();
+
+  } catch (err) {
+    alert('发送失败，请重试');
+    console.error(err);
+  }
+
+  sendBtn.disabled = false;
+  sendBtn.textContent = '发送';
 }
+
+sendBtn.addEventListener('click', sendNote);
+textInp.addEventListener('keydown', e => { if (e.key === 'Enter') sendNote(); });
 
 // ===== DELETE MODAL =====
+let pendingDeleteId = null;
+
 function openDeleteModal(docId) {
-  pendingDelete = docId;
-  const modal = document.getElementById('delete-modal');
-  const codeInput = document.getElementById('modal-code');
-  const errEl = document.getElementById('modal-error');
-  codeInput.value = '';
-  errEl.textContent = '';
-  modal.style.display = 'flex';
-  codeInput.focus();
+  pendingDeleteId = docId;
+  document.getElementById('modal-code').value = '';
+  document.getElementById('modal-error').textContent = '';
+  document.getElementById('delete-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('modal-code').focus(), 50);
 }
 
 document.getElementById('modal-cancel').addEventListener('click', () => {
   document.getElementById('delete-modal').style.display = 'none';
-  pendingDelete = null;
+  pendingDeleteId = null;
 });
 
 document.getElementById('modal-confirm').addEventListener('click', async () => {
-  const code = document.getElementById('modal-code').value.trim();
+  const code  = document.getElementById('modal-code').value.trim();
   const errEl = document.getElementById('modal-error');
-  if (!code || code.length !== 6) {
-    errEl.textContent = '请输入 6 位删除码';
-    return;
-  }
+  if (code.length !== 6) { errEl.textContent = '请输入 6 位删除码'; return; }
 
-  // find the sticky with matching docId and check code via Firestore
-  // We'll try to delete and let security rules handle it, but since we're in test mode
-  // we fetch the doc first to verify code client-side
   try {
-    const { getDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-    const docRef = doc(db, 'messages', pendingDelete);
-    const snap = await getDoc(docRef);
-
-    if (!snap.exists()) {
-      errEl.textContent = '留言不存在';
-      return;
-    }
-
+    const ref  = doc(db, 'messages', pendingDeleteId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) { errEl.textContent = '留言不存在'; return; }
     const data = snap.data();
-
-    if (data.deleteCode !== code) {
-      errEl.textContent = '删除码错误，请重试';
-      return;
-    }
-
-    if (data.expiresAt && Date.now() > data.expiresAt) {
-      errEl.textContent = '删除码已过期（超过 1 小时）';
-      return;
-    }
-
-    await deleteDoc(docRef);
+    if (data.deleteCode !== code) { errEl.textContent = '删除码错误，请重试'; return; }
+    if (data.expiresAt && Date.now() > data.expiresAt) { errEl.textContent = '删除码已过期（超过 1 小时）'; return; }
+    await deleteDoc(ref);
     document.getElementById('delete-modal').style.display = 'none';
-    pendingDelete = null;
-
+    pendingDeleteId = null;
   } catch (err) {
     errEl.textContent = '删除失败，请重试';
     console.error(err);
@@ -313,34 +301,18 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
 
 // ===== CODE TOAST =====
 function showCodeToast(code) {
-  const toast = document.getElementById('code-toast');
   document.getElementById('toast-code-val').textContent = code;
-  toast.style.display = 'flex';
+  document.getElementById('code-toast').style.display = 'flex';
 }
 
 document.getElementById('toast-close').addEventListener('click', () => {
   document.getElementById('code-toast').style.display = 'none';
 });
 
-// ===== UTILS =====
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// ===== ADD ANIMATION KEYFRAME =====
+const s = document.createElement('style');
+s.textContent = `@keyframes stickyIn { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }`;
+document.head.appendChild(s);
 
-// ===== EVENTS =====
-// Desktop icons: double click
-document.querySelectorAll('.icon').forEach(icon => {
-  let clicks = 0;
-  icon.addEventListener('click', () => {
-    clicks++;
-    if (clicks === 1) setTimeout(() => { clicks = 0; }, 300);
-    if (clicks >= 2) { openApp(icon.dataset.app); clicks = 0; }
-  });
-});
-
-// Dock: single click
-document.querySelectorAll('.dock-item').forEach(item => {
-  item.addEventListener('click', () => openApp(item.dataset.app));
-});
+// ===== INIT =====
+applyTransform();
