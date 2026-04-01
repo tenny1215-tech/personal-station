@@ -24,10 +24,10 @@ const db  = getFirestore(app);
 
 // ===== APP CONFIG =====
 const appConfig = {
-  notebook:  { title: '📓 留言板',  tpl: 'tpl-notebook',  w: 400, h: 460 },
-  about:     { title: '👤 关于我',  tpl: 'tpl-about',     w: 360, h: 420 },
-  projects:  { title: '💼 我的项目', tpl: 'tpl-projects',  w: 440, h: 480 },
-  contact:   { title: '✉️ 联系我',  tpl: 'tpl-contact',   w: 360, h: 380 },
+  notebook:  { title: '留言板',  icon: '📓', tpl: 'tpl-notebook',  w: 400, h: 460 },
+  about:     { title: '关于我',  icon: '👤', tpl: 'tpl-about',     w: 360, h: 430 },
+  projects:  { title: '我的项目', icon: '💼', tpl: 'tpl-projects',  w: 440, h: 440 },
+  contact:   { title: '联系我',  icon: '✉️', tpl: 'tpl-contact',   w: 360, h: 360 },
 };
 
 // ===== STATE =====
@@ -72,16 +72,17 @@ function openApp(appId) {
   win.style.left = x + 'px';
   win.style.top  = y + 'px';
 
-  // title bar
+  // title bar — Win2000 style
   const titlebar = document.createElement('div');
   titlebar.className = 'win-titlebar';
   titlebar.innerHTML = `
-    <div class="win-dots">
-      <div class="win-dot red"    data-action="close"></div>
-      <div class="win-dot yellow" data-action="min"></div>
-      <div class="win-dot green"  data-action="max"></div>
-    </div>
+    <span class="win-title-icon">${cfg.icon}</span>
     <div class="win-title">${cfg.title}</div>
+    <div class="win-dots">
+      <div class="win-dot yellow" data-action="min" title="最小化"></div>
+      <div class="win-dot green"  data-action="max" title="最大化"></div>
+      <div class="win-dot red"    data-action="close" title="关闭"></div>
+    </div>
   `;
 
   // content
@@ -97,8 +98,11 @@ function openApp(appId) {
   const dockItem = document.querySelector(`.dock-item[data-app="${appId}"]`);
   if (dockItem) dockItem.classList.add('open');
 
-  // close button
+  // window controls
   titlebar.querySelector('[data-action="close"]').addEventListener('click', () => closeWindow(appId));
+  titlebar.querySelector('[data-action="min"]')?.addEventListener('click', () => {
+    win.style.display = win.style.display === 'none' ? 'flex' : 'none';
+  });
 
   // focus on click
   win.addEventListener('mousedown', () => focusWindow(win));
