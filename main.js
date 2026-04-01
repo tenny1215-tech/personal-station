@@ -35,6 +35,9 @@ const myColor = CURSOR_COLORS[Math.floor(Math.random() * CURSOR_COLORS.length)];
 // ===== ADMIN =====
 let isAdmin = false;
 
+// ===== BOARD CLEANUP =====
+let boardUnsub = null; // firestore listener to cancel on close
+
 // ===== DESKTOP APP SYSTEM =====
 const appConfig = {
   notebook: { title: '📌 留言板', tpl: 'tpl-notebook', w: 820, h: 560 },
@@ -96,6 +99,13 @@ function closeApp(appId) {
   delete openWindows[appId];
   const d = document.querySelector(`.dock-item[data-app="${appId}"]`);
   if (d) d.classList.remove('open');
+  if (appId === 'notebook') {
+    if (boardUnsub) { boardUnsub(); boardUnsub = null; }
+    notesData = {}; noteEls = {}; lineEls = {};
+    placedRects = [];
+    noteCount = 0;
+    brdScale = 1; brdPanX = 0; brdPanY = 0;
+  }
 }
 
 function focusWin(win) { win.style.zIndex = ++zTop; }
@@ -138,18 +148,14 @@ function tick() {
 tick(); setInterval(tick, 10000);
 
 // ===== BOARD INIT =====
-let boardInitialized = false;
 let brdScale = 1, brdPanX = 0, brdPanY = 0;
 let brdIsPanning = false, brdPanSX = 0, brdPanSY = 0;
-const notesData = {}, noteEls = {}, lineEls = {};
+let notesData = {}, noteEls = {}, lineEls = {};
 let noteCount = 0;
-const placedRects = [];
-let firestoreUnsub = null;
+let placedRects = [];
 let dragThrottle = 0;
 
 function initBoard(win) {
-  if (boardInitialized) return;
-  boardInitialized = true;
 
   const wrap       = win.querySelector('#brd-wrap');
   const canvasEl   = win.querySelector('#brd-canvas');
@@ -319,7 +325,7 @@ function initBoard(win) {
 
   // firestore
   const q = query(collection(db, 'messages'), orderBy('createdAt', 'asc'));
-  firestoreUnsub = onSnapshot(q, snapshot => {
+  boardUnsub = onSnapshot(q, snapshot => {
     snapshot.docChanges().forEach(change => {
       if (change.type === 'added' || change.type === 'modified') renderNote(change.doc.id, change.doc.data());
       if (change.type === 'removed') removeNote(change.doc.id);
