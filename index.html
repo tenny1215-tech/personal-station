@@ -2,8 +2,8 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tenny's Station</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Tenny's 留言板</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌈</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -11,202 +11,70 @@
 </head>
 <body>
 
-  <!-- MENU BAR -->
-  <div id="menubar">
-    <span class="menu-logo">🌈 Tenny's Station</span>
-    <div class="menu-links">
-      <span></span><span></span><span></span>
+  <!-- TOP BAR -->
+  <header id="topbar">
+    <div class="top-left">
+      <span class="site-title">🌈 Tenny's 留言板</span>
+      <span class="note-count" id="note-count"></span>
     </div>
-    <div class="menu-right" id="menuClock"></div>
+    <button class="admin-btn" id="admin-btn" title="管理员">🔒</button>
+  </header>
+
+  <!-- CANVAS WRAP -->
+  <div id="canvas-wrap">
+    <svg id="grid-svg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="1" fill="#d1d5db" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#dots)" />
+    </svg>
+    <svg id="lines-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="canvas"></div>
   </div>
 
-  <!-- DESKTOP -->
-  <div id="desktop">
-    <div class="desktop-icons">
-      <div class="icon" data-app="notebook">
-        <div class="icon-img" style="background:linear-gradient(145deg,#f9c74f,#f3722c)">👸🏼</div>
-        <span>姐妹来留言</span>
-      </div>
-      <div class="icon" data-app="about">
-        <div class="icon-img" style="background:linear-gradient(145deg,#4cc9f0,#4361ee)">👤</div>
-        <span>关于我</span>
-      </div>
-      <div class="icon" data-app="projects">
-        <div class="icon-img" style="background:linear-gradient(145deg,#7209b7,#560bad)">💼</div>
-        <span>项目</span>
-      </div>
-      <div class="icon" data-app="contact">
-        <div class="icon-img" style="background:linear-gradient(145deg,#f72585,#b5179e)">✉️</div>
-        <span>联系我</span>
-      </div>
-    </div>
-    <div id="windows"></div>
+  <!-- ZOOM CONTROLS (desktop only) -->
+  <div id="zoom-controls">
+    <button class="zoom-btn" id="zoom-out">−</button>
+    <span id="zoom-label">100%</span>
+    <button class="zoom-btn" id="zoom-in">+</button>
+    <button class="zoom-btn" id="zoom-reset">⌂</button>
   </div>
 
-  <!-- DOCK -->
-  <div id="dock">
-    <div class="dock-item" data-app="notebook" title="留言板">
-      <div class="dock-icon" style="background:linear-gradient(145deg,#f9c74f,#f3722c)">👸🏼</div>
-      <div class="dock-dot"></div>
-    </div>
-    <div class="dock-item" data-app="about" title="关于我">
-      <div class="dock-icon" style="background:linear-gradient(145deg,#4cc9f0,#4361ee)">👤</div>
-      <div class="dock-dot"></div>
-    </div>
-    <div class="dock-item" data-app="projects" title="项目">
-      <div class="dock-icon" style="background:linear-gradient(145deg,#7209b7,#560bad)">💼</div>
-      <div class="dock-dot"></div>
-    </div>
-    <div class="dock-item" data-app="contact" title="联系我">
-      <div class="dock-icon" style="background:linear-gradient(145deg,#f72585,#b5179e)">✉️</div>
-      <div class="dock-dot"></div>
+  <!-- BOTTOM INPUT BAR -->
+  <div id="inputbar">
+    <div class="inputbar-inner">
+      <input id="inp-name" type="text" placeholder="名字（可不填）" maxlength="16" autocomplete="off" />
+      <div class="inp-sep"></div>
+      <input id="inp-text" type="text" placeholder="留下你的留言 ✨" maxlength="100" autocomplete="off" />
+      <button id="inp-send">发送</button>
     </div>
   </div>
-
-  <!-- WINDOW TEMPLATES -->
-
-  <!-- Notebook: infinite canvas board -->
-  <template id="tpl-notebook">
-    <div class="win-body board-win-body">
-      <!-- board toolbar -->
-      <div class="board-toolbar">
-        <div class="board-toolbar-left">
-          <button class="zoom-btn" id="brd-zoom-out">−</button>
-          <span class="zoom-label" id="brd-zoom-label">100%</span>
-          <button class="zoom-btn" id="brd-zoom-in">+</button>
-          <button class="zoom-btn" id="brd-zoom-reset">⌂</button>
-        </div>
-        <div class="board-toolbar-right">
-          <span class="online-dot"></span>
-          <span id="brd-online">0 人在线</span>
-          <span class="brd-sep">·</span>
-          <span id="brd-count">0 条留言</span>
-          <span class="brd-sep">·</span>
-          <button class="admin-btn" id="brd-admin-btn" title="管理员">🔒</button>
-        </div>
-      </div>
-
-      <!-- canvas area -->
-      <div class="board-canvas-wrap" id="brd-wrap">
-        <svg class="brd-grid" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
-          <defs>
-            <pattern id="bdots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
-              <circle cx="1" cy="1" r="1" fill="#d1d5db" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#bdots)" />
-        </svg>
-        <svg id="brd-lines" xmlns="http://www.w3.org/2000/svg"
-          style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1"></svg>
-        <div id="brd-canvas"></div>
-        <div id="brd-cursors"></div>
-      </div>
-
-      <!-- input bar -->
-      <div class="board-inputbar">
-        <input class="inp-name" id="brd-name" type="text" placeholder="你的名字（可匿名）" maxlength="16" />
-        <div class="inp-divider"></div>
-        <input class="inp-text" id="brd-text" type="text" placeholder="说点什么吧 ✨" maxlength="100" />
-        <button class="inp-send" id="brd-send">发送</button>
-      </div>
-    </div>
-  </template>
-
-  <!-- About -->
-  <template id="tpl-about">
-    <div class="win-body about-body">
-      <div class="about-avatar">👩‍💻</div>
-      <h2 class="about-name">Tenny Shen</h2>
-      <p class="about-role">Designer | Developer · Paris 🇫🇷</p>
-      <div class="about-tags">
-        <span class="atag">React</span><span class="atag">Node.js</span>
-        <span class="atag">Firebase</span><span class="atag">TypeScript</span>
-      </div>
-      <p class="about-bio">人在巴黎，欢迎来玩 🙌</p>
-      <div class="about-stats">
-        <div class="astat"><div class="astat-num">7+</div><div class="astat-label">年经验</div></div>
-        <div class="astat"><div class="astat-num">12</div><div class="astat-label">个项目</div></div>
-        <div class="astat"><div class="astat-num">∞</div><div class="astat-label">杯咖啡</div></div>
-      </div>
-    </div>
-  </template>
-
-  <!-- Projects -->
-  <template id="tpl-projects">
-    <div class="win-body projects-body">
-      <div class="proj-card">
-        <div class="proj-icon" style="background:linear-gradient(135deg,#667eea,#764ba2)">🤖</div>
-        <div class="proj-info">
-          <div class="proj-title">AI 工具地图</div>
-          <div class="proj-desc">收录 200+ AI 工具的导航网站，按类型分类，每周更新</div>
-          <div class="proj-tags"><span class="ptag">Next.js</span><span class="ptag">Notion API</span></div>
-        </div>
-      </div>
-      <div class="proj-card">
-        <div class="proj-icon" style="background:linear-gradient(135deg,#f093fb,#f5576c)">📊</div>
-        <div class="proj-info">
-          <div class="proj-title">AI Investor</div>
-          <div class="proj-desc">AI 驱动的股票分析工具，自动生成投资报告</div>
-          <div class="proj-tags"><span class="ptag">Python</span><span class="ptag">OpenAI</span></div>
-        </div>
-      </div>
-      <div class="proj-card">
-        <div class="proj-icon" style="background:linear-gradient(135deg,#4facfe,#00f2fe)">✍️</div>
-        <div class="proj-info">
-          <div class="proj-title">PostGen</div>
-          <div class="proj-desc">30 天社群贴文生成器，支持多平台格式</div>
-          <div class="proj-tags"><span class="ptag">Gemini AI</span><span class="ptag">Web App</span></div>
-        </div>
-      </div>
-      <div class="proj-card">
-        <div class="proj-icon" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">📋</div>
-        <div class="proj-info">
-          <div class="proj-title">WorkRecord</div>
-          <div class="proj-desc">工作记录与时间追踪工具，帮助提升工作效率</div>
-          <div class="proj-tags"><span class="ptag">Vue.js</span><span class="ptag">Firebase</span></div>
-        </div>
-      </div>
-    </div>
-  </template>
-
-  <!-- Contact -->
-  <template id="tpl-contact">
-    <div class="win-body contact-body">
-      <div class="contact-avatar">✉️</div>
-      <h2 class="contact-title">别联系我了</h2>
-      <p class="contact-sub">直接留言板留言吧</p>
-      <div class="contact-links">
-       
-        <a class="clink" href="https://github.com/tenny1215-tech" target="_blank">
-          <span class="clink-icon">⌥</span><span>github.com/tenny1215-tech</span>
-        </a>
-      </div>
-    </div>
-  </template>
 
   <!-- ADMIN MODAL -->
-  <div id="admin-modal" class="modal-overlay" style="display:none">
-    <div class="modal-box">
+  <div id="admin-modal" class="modal-wrap" style="display:none">
+    <div class="modal">
       <div class="modal-title">🔑 管理员登录</div>
-      <input class="modal-input" id="admin-pass" type="password" placeholder="请输入密码" maxlength="20" />
+      <input id="admin-pass" type="password" placeholder="请输入密码" maxlength="20" />
       <div class="modal-error" id="admin-error"></div>
       <div class="modal-btns">
-        <button class="modal-cancel" id="admin-cancel">取消</button>
-        <button class="modal-confirm" id="admin-confirm">登录</button>
+        <button class="btn-cancel" id="admin-cancel">取消</button>
+        <button class="btn-confirm" id="admin-confirm">登录</button>
       </div>
     </div>
   </div>
 
   <!-- REPLY MODAL -->
-  <div id="reply-modal" class="modal-overlay" style="display:none">
-    <div class="modal-box">
-      <div class="modal-title">💬 回复留言</div>
-      <div class="reply-original" id="reply-original"></div>
-      <input class="modal-input-sm" id="reply-name" type="text" placeholder="你的名字（可匿名）" maxlength="16" />
-      <textarea class="modal-textarea" id="reply-text" placeholder="写下你的回复 ✨" maxlength="100" rows="3"></textarea>
+  <div id="reply-modal" class="modal-wrap" style="display:none">
+    <div class="modal">
+      <div class="modal-title">💬 回复</div>
+      <div class="reply-preview" id="reply-preview"></div>
+      <input id="reply-name" type="text" placeholder="名字（可不填）" maxlength="16" autocomplete="off" />
+      <textarea id="reply-text" placeholder="写下你的回复 ✨" maxlength="100" rows="3"></textarea>
       <div class="modal-btns">
-        <button class="modal-cancel" id="reply-cancel">取消</button>
-        <button class="modal-confirm" id="reply-confirm">发送回复</button>
+        <button class="btn-cancel" id="reply-cancel">取消</button>
+        <button class="btn-confirm" id="reply-confirm">发送</button>
       </div>
     </div>
   </div>
