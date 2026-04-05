@@ -392,7 +392,6 @@ async function sendNote() {
 }
 
 sendBtn.addEventListener('click', sendNote);
-textInp.addEventListener('keydown', e => { if (e.key === 'Enter') sendNote(); });
 
 // ===== REPLY =====
 let replyTargetId = null;
