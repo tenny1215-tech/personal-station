@@ -97,6 +97,7 @@ function listenIncome() {
 
 // ── 转账表单 ──────────────────────────────────────────────
 function resetTransferForm() {
+  document.getElementById("t-edit-id").value = "";
   ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-ibkr","t-ibkr-fee","t-note"].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value="";
   });
@@ -149,6 +150,8 @@ function calcPreview() {
 }
 
 async function saveTransfer() {
+  const editId = document.getElementById("t-edit-id").value; // 1. 获取 ID
+
   const usdBought = parseFloat(document.getElementById("t-usd-bought").value)||0;
   const cnySpent  = parseFloat(document.getElementById("t-cny-spent").value)||0;
   const usdSent   = parseFloat(document.getElementById("t-usd-sent").value)||0;
@@ -166,12 +169,21 @@ async function saveTransfer() {
   const totalCNY = +(cnySpent + wireFee).toFixed(2);
   const totalUSDCost = +(totalCNY / rate).toFixed(2);
 
-  await addDoc(collection(db,"transfers"), {
+  const payload = {
     usdBought, cnySpent, usdSent, wireFee, wireFeeUSD,
     ibkr, ibkrFee, rate, totalCNY, totalUSDCost,
-    date, note, createdAt: serverTimestamp()
-  });
+    date, note
+  };
+
+  // 2. 根据是否有 editId 来决定是“更新”还是“新增”
+  if (editId) {
+    await updateDoc(doc(db, "transfers", editId), payload);
+  } else {
+    await addDoc(collection(db, "transfers"), { ...payload, createdAt: serverTimestamp() });
+  }
+
   closeModal("transfer");
+  resetTransferForm(); // 这里会执行你刚加好的清空逻辑
 }
 
 // ── 持仓 ──────────────────────────────────────────────────
@@ -268,13 +280,17 @@ function renderTransfers() {
   const el=document.getElementById("transfer-list");
   const arr=Object.values(transfers);
   if(arr.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">💸</div><div class="empty-text">还没有转账记录<br>点右下角 ＋ 添加</div></div>`;return;}
+  
   el.innerHTML=arr.map(t=>`<div class="transfer-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
       <div>
         <div style="font-size:15px;font-weight:700;color:var(--accent)">$${f2(t.ibkr)} 到账 IBKR</div>
         <div style="font-size:12px;color:var(--muted);margin-top:2px">${t.date}${t.note?" · "+t.note:""}</div>
       </div>
-      <button class="btn-sm-danger" data-del-transfer="${t.id}">删除</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-sm-ghost" data-edit-transfer="${t.id}">编辑</button>
+        <button class="btn-sm-danger" data-del-transfer="${t.id}">删除</button>
+      </div>
     </div>
     <div class="step-mini">① 换汇</div>
     <div class="tm-grid">
@@ -293,8 +309,30 @@ function renderTransfers() {
       <div><div class="tm-label">等值美金成本</div><div class="tm-value" style="color:var(--yellow)">$${f2(t.totalUSDCost)}</div></div>
     </div>
   </div>`).join("");
+
   el.querySelectorAll("[data-del-transfer]").forEach(btn=>{
     btn.addEventListener("click",()=>deleteTransfer(btn.dataset.delTransfer));
+  });
+
+  // 关键：绑定编辑按钮的点击事件
+  el.querySelectorAll("[data-edit-transfer]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const t = transfers[btn.dataset.editTransfer];
+      if(!t) return;
+      // 把数据塞回弹窗表单
+      document.getElementById("t-edit-id").value = t.id;
+      document.getElementById("t-usd-bought").value = t.usdBought;
+      document.getElementById("t-cny-spent").value = t.cnySpent;
+      document.getElementById("t-usd-sent").value = t.usdSent || "";
+      document.getElementById("t-wire-fee").value = t.wireFee || "";
+      document.getElementById("t-ibkr").value = t.ibkr;
+      document.getElementById("t-ibkr-fee").value = t.ibkrFee || "";
+      document.getElementById("t-date").value = t.date;
+      document.getElementById("t-note").value = t.note || "";
+      
+      calcPreview(); // 触发预览计算
+      openModal("transfer");
+    });
   });
 }
 
