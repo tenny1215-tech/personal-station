@@ -24,13 +24,11 @@
 
 <!-- 主应用 -->
 <div id="app" style="display:none">
-
   <div class="topbar">
     <div class="topbar-title">📊 投资账本</div>
-    <button class="topbar-lock" id="logout-btn" title="锁定">🔒</button>
+    <button class="topbar-lock" id="logout-btn">🔒</button>
   </div>
 
-  <!-- 页面内容 -->
   <div id="page-overview" class="page active">
     <div class="section-title">总览</div>
     <div class="summary-grid" id="overview-grid"></div>
@@ -55,25 +53,14 @@
     <div id="income-list"></div>
   </div>
 
-  <!-- FAB -->
   <button class="fab" id="fab">＋</button>
 
-  <!-- 底部导航 -->
   <nav class="bottom-nav">
-    <button class="nav-item active" id="nav-overview">
-      <span class="nav-icon">📊</span>总览
-    </button>
-    <button class="nav-item" id="nav-transfers">
-      <span class="nav-icon">💸</span>转账
-    </button>
-    <button class="nav-item" id="nav-holdings">
-      <span class="nav-icon">📈</span>持仓
-    </button>
-    <button class="nav-item" id="nav-income">
-      <span class="nav-icon">💰</span>收入
-    </button>
+    <button class="nav-item active" id="nav-overview"><span class="nav-icon">📊</span>总览</button>
+    <button class="nav-item" id="nav-transfers"><span class="nav-icon">💸</span>转账</button>
+    <button class="nav-item" id="nav-holdings"><span class="nav-icon">📈</span>持仓</button>
+    <button class="nav-item" id="nav-income"><span class="nav-icon">💰</span>收入</button>
   </nav>
-
 </div>
 
 <!-- 弹窗：选择类型 -->
@@ -82,7 +69,7 @@
     <div class="modal-handle"></div>
     <div class="modal-title">添加什么？</div>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <button class="btn btn-ghost" id="btn-add-transfer">💸 转账记录（人民币 → 汇丰 → IBKR）</button>
+      <button class="btn btn-ghost" id="btn-add-transfer">💸 转账记录</button>
       <button class="btn btn-ghost" id="btn-add-holding">📈 买入股票 / ETF</button>
       <button class="btn btn-ghost" id="btn-add-income">💰 利息 / 股息收入</button>
       <button class="btn btn-ghost muted" id="btn-cancel-select">取消</button>
@@ -90,50 +77,78 @@
   </div>
 </div>
 
-<!-- 弹窗：转账 -->
+<!-- 弹窗：转账（重新设计） -->
 <div class="modal-overlay" id="modal-transfer">
   <div class="modal-box">
     <div class="modal-handle"></div>
     <div class="modal-title">转账记录</div>
-    <div class="form-section-label" style="margin-top:0">第一步：人民币换美金</div>
+
+    <!-- 第一步 -->
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-label">换汇</div>
+    </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">人民币金额 ¥</label>
-        <input class="form-input" id="t-cny" type="number" placeholder="如：200000">
+        <label class="form-label">购买美金 $</label>
+        <input class="form-input" id="t-usd-bought" type="number" placeholder="如：15000" step="0.01">
       </div>
       <div class="form-group">
-        <label class="form-label">换汇汇率</label>
-        <input class="form-input" id="t-rate" type="number" placeholder="如：7.25" step="0.001">
+        <label class="form-label">花费人民币 ¥</label>
+        <input class="form-input" id="t-cny-spent" type="number" placeholder="如：102549" step="0.01">
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">换汇手续费 $</label>
-      <input class="form-input" id="t-fx-fee" type="number" placeholder="如：15" step="0.01">
+    <div class="auto-calc" id="calc-rate">填写以上两栏自动计算汇率</div>
+
+    <!-- 第二步 -->
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-label">汇出（建行 → 汇丰）</div>
     </div>
-    <div class="form-section-label">第二步：汇丰电汇</div>
-    <div class="form-group">
-      <label class="form-label">汇丰手续费 $</label>
-      <input class="form-input" id="t-hsbc-fee" type="number" placeholder="如：25" step="0.01">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">汇出美金 $</label>
+        <input class="form-input" id="t-usd-sent" type="number" placeholder="如：17500" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">邮电费+手续费 ¥</label>
+        <input class="form-input" id="t-wire-fee" type="number" placeholder="如：159.72" step="0.01">
+      </div>
     </div>
-    <div class="form-section-label">第三步：IBKR 到账</div>
-    <div class="form-group">
-      <label class="form-label">IBKR 实际到账 $</label>
-      <input class="form-input" id="t-ibkr" type="number" placeholder="如：27500" step="0.01">
+
+    <!-- 第三步 -->
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-label">IBKR 到账</div>
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">IBKR 到账金额 $</label>
+        <input class="form-input" id="t-ibkr" type="number" placeholder="如：14980" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">IBKR 手续费 $</label>
+        <input class="form-input" id="t-ibkr-fee" type="number" placeholder="如：0" step="0.01">
+      </div>
+    </div>
+
+    <!-- 自动汇总 -->
     <div class="preview-box" id="t-preview">
       <div class="preview-label-title">📋 此次转账汇总</div>
       <div class="preview-grid" id="t-preview-content"></div>
     </div>
-    <div class="form-row">
+
+    <div class="form-row" style="margin-top:4px">
       <div class="form-group">
         <label class="form-label">日期</label>
         <input class="form-input" id="t-date" type="date">
       </div>
       <div class="form-group">
         <label class="form-label">备注（可选）</label>
-        <input class="form-input" id="t-note" type="text" placeholder="如：第一笔入金">
+        <input class="form-input" id="t-note" type="text" placeholder="如：第一笔">
       </div>
     </div>
+
     <div class="btn-row">
       <button class="btn btn-ghost" id="btn-transfer-cancel">取消</button>
       <button class="btn btn-primary" id="btn-transfer-save">保存</button>

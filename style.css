@@ -103,3 +103,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 
 /* LOADING */
 .loading{text-align:center;padding:40px;color:var(--muted);font-size:14px;}
+
+/* STEP HEADERS */
+.step-header{display:flex;align-items:center;gap:10px;margin:18px 0 12px;border-top:1px solid var(--border);padding-top:14px;}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.step-label{font-size:14px;font-weight:600;color:var(--text);}
+
+/* AUTO CALC DISPLAY */
+.auto-calc{background:var(--card2);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--muted);margin-bottom:4px;}
+.auto-calc.active{color:var(--accent);font-weight:600;}
+.step-mini{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:10px 0 6px;}
