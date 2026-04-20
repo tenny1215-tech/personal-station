@@ -31,7 +31,18 @@ document.getElementById("lock-btn").addEventListener("click", () => {
   }
 });
 document.getElementById("lock-input").addEventListener("keydown", e => { if(e.key==="Enter") document.getElementById("lock-btn").click(); });
-document.getElementById("logout-btn").addEventListener("click", () => { sessionStorage.removeItem("ivt_auth"); location.reload(); });
+document.getElementById("logout-btn").addEventListener("click", () => { 
+  // 1. 清除本地授权状态
+  sessionStorage.removeItem("ivt_auth"); 
+  
+  // 2. 清空当前内存中的数据，防止闪现旧账本
+  transfers = {}; 
+  holdings = {}; 
+  income = {}; 
+  
+  // 3. 彻底重定向到首页，强制刷新所有状态
+  window.location.replace(window.location.origin + window.location.pathname);
+});
 if (checkAuth()) unlock();
 
 // ── 工具 ──────────────────────────────────────────────────
