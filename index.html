@@ -1,84 +1,241 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Tenny's 留言板</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌈</text></svg>" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="投资账本">
+<title>Tenny 投资账本</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- TOP BAR -->
-  <header id="topbar">
-    <div class="top-left">
-      <span class="site-title">🌈 Tenny's 留言板</span>
-      <span class="note-count" id="note-count"></span>
+<!-- 密码锁屏 -->
+<div id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-icon">📊</div>
+    <div class="lock-title">投资账本</div>
+    <div class="lock-sub">请输入密码</div>
+    <input type="password" id="lock-input" placeholder="密码" autocomplete="off">
+    <div id="lock-error"></div>
+    <button id="lock-btn">进入</button>
+  </div>
+</div>
+
+<!-- 主应用 -->
+<div id="app" style="display:none">
+
+  <div class="topbar">
+    <div class="topbar-title">📊 投资账本</div>
+    <button class="topbar-lock" id="logout-btn" title="锁定">🔒</button>
+  </div>
+
+  <!-- 页面内容 -->
+  <div id="page-overview" class="page active">
+    <div class="section-title">总览</div>
+    <div class="summary-grid" id="overview-grid"></div>
+    <div class="section-title">转账汇总</div>
+    <div class="card" id="flow-summary"></div>
+    <div class="section-title">我的持仓</div>
+    <div id="overview-holdings"></div>
+  </div>
+
+  <div id="page-transfers" class="page">
+    <div class="section-title">转账记录</div>
+    <div id="transfer-list"></div>
+  </div>
+
+  <div id="page-holdings" class="page">
+    <div class="section-title">持仓明细</div>
+    <div id="holdings-list"></div>
+  </div>
+
+  <div id="page-income" class="page">
+    <div class="section-title">收入记录</div>
+    <div id="income-list"></div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="fab">＋</button>
+
+  <!-- 底部导航 -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="nav-overview">
+      <span class="nav-icon">📊</span>总览
+    </button>
+    <button class="nav-item" id="nav-transfers">
+      <span class="nav-icon">💸</span>转账
+    </button>
+    <button class="nav-item" id="nav-holdings">
+      <span class="nav-icon">📈</span>持仓
+    </button>
+    <button class="nav-item" id="nav-income">
+      <span class="nav-icon">💰</span>收入
+    </button>
+  </nav>
+
+</div>
+
+<!-- 弹窗：选择类型 -->
+<div class="modal-overlay" id="modal-select">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">添加什么？</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn btn-ghost" id="btn-add-transfer">💸 转账记录（人民币 → 汇丰 → IBKR）</button>
+      <button class="btn btn-ghost" id="btn-add-holding">📈 买入股票 / ETF</button>
+      <button class="btn btn-ghost" id="btn-add-income">💰 利息 / 股息收入</button>
+      <button class="btn btn-ghost muted" id="btn-cancel-select">取消</button>
     </div>
-    <button class="admin-btn" id="admin-btn" title="管理员">🔒</button>
-  </header>
-
-  <!-- CANVAS WRAP -->
-  <div id="canvas-wrap">
-    <svg id="grid-svg" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <pattern id="dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
-          <circle cx="1" cy="1" r="1" fill="#d1d5db" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#dots)" />
-    </svg>
-    <svg id="lines-svg" xmlns="http://www.w3.org/2000/svg"></svg>
-    <div id="canvas"></div>
   </div>
+</div>
 
-  <!-- ZOOM CONTROLS (desktop only) -->
-  <div id="zoom-controls">
-    <button class="zoom-btn" id="zoom-out">−</button>
-    <span id="zoom-label">100%</span>
-    <button class="zoom-btn" id="zoom-in">+</button>
-    <button class="zoom-btn" id="zoom-reset">⌂</button>
-  </div>
-
-  <!-- BOTTOM INPUT BAR -->
-  <div id="inputbar">
-    <div class="inputbar-inner">
-      <input id="inp-name" type="text" placeholder="名字（可不填）" maxlength="16" autocomplete="off" />
-      <div class="inp-sep"></div>
-      <input id="inp-text" type="text" placeholder="留下你的留言 ✨" maxlength="100" autocomplete="off" />
-      <button id="inp-send">发送</button>
-    </div>
-  </div>
-
-  <!-- ADMIN MODAL -->
-  <div id="admin-modal" class="modal-wrap" style="display:none">
-    <div class="modal">
-      <div class="modal-title">🔑 管理员登录</div>
-      <input id="admin-pass" type="password" placeholder="请输入密码" maxlength="20" />
-      <div class="modal-error" id="admin-error"></div>
-      <div class="modal-btns">
-        <button class="btn-cancel" id="admin-cancel">取消</button>
-        <button class="btn-confirm" id="admin-confirm">登录</button>
+<!-- 弹窗：转账 -->
+<div class="modal-overlay" id="modal-transfer">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">转账记录</div>
+    <div class="form-section-label" style="margin-top:0">第一步：人民币换美金</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">人民币金额 ¥</label>
+        <input class="form-input" id="t-cny" type="number" placeholder="如：200000">
+      </div>
+      <div class="form-group">
+        <label class="form-label">换汇汇率</label>
+        <input class="form-input" id="t-rate" type="number" placeholder="如：7.25" step="0.001">
       </div>
     </div>
-  </div>
-
-  <!-- REPLY MODAL -->
-  <div id="reply-modal" class="modal-wrap" style="display:none">
-    <div class="modal">
-      <div class="modal-title">💬 回复</div>
-      <div class="reply-preview" id="reply-preview"></div>
-      <input id="reply-name" type="text" placeholder="名字（可不填）" maxlength="16" autocomplete="off" />
-      <textarea id="reply-text" placeholder="写下你的回复 ✨" maxlength="100" rows="3"></textarea>
-      <div class="modal-btns">
-        <button class="btn-cancel" id="reply-cancel">取消</button>
-        <button class="btn-confirm" id="reply-confirm">发送</button>
+    <div class="form-group">
+      <label class="form-label">换汇手续费 $</label>
+      <input class="form-input" id="t-fx-fee" type="number" placeholder="如：15" step="0.01">
+    </div>
+    <div class="form-section-label">第二步：汇丰电汇</div>
+    <div class="form-group">
+      <label class="form-label">汇丰手续费 $</label>
+      <input class="form-input" id="t-hsbc-fee" type="number" placeholder="如：25" step="0.01">
+    </div>
+    <div class="form-section-label">第三步：IBKR 到账</div>
+    <div class="form-group">
+      <label class="form-label">IBKR 实际到账 $</label>
+      <input class="form-input" id="t-ibkr" type="number" placeholder="如：27500" step="0.01">
+    </div>
+    <div class="preview-box" id="t-preview">
+      <div class="preview-label-title">📋 此次转账汇总</div>
+      <div class="preview-grid" id="t-preview-content"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">日期</label>
+        <input class="form-input" id="t-date" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注（可选）</label>
+        <input class="form-input" id="t-note" type="text" placeholder="如：第一笔入金">
       </div>
     </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-transfer-cancel">取消</button>
+      <button class="btn btn-primary" id="btn-transfer-save">保存</button>
+    </div>
   </div>
+</div>
 
-  <script type="module" src="main.js"></script>
+<!-- 弹窗：持仓 -->
+<div class="modal-overlay" id="modal-holding">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="holding-modal-title">买入股票</div>
+    <input type="hidden" id="h-edit-id">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">股票代码</label>
+        <input class="form-input" id="h-ticker" type="text" placeholder="如：MSFT">
+      </div>
+      <div class="form-group">
+        <label class="form-label">名称（可选）</label>
+        <input class="form-input" id="h-name" type="text" placeholder="如：微软">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">买入价 $</label>
+        <input class="form-input" id="h-price" type="number" placeholder="如：416" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">股数</label>
+        <input class="form-input" id="h-shares" type="number" placeholder="如：3" step="0.01">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">交易佣金 $</label>
+        <input class="form-input" id="h-commission" type="number" placeholder="如：1.5" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">当前价格 $</label>
+        <input class="form-input" id="h-current" type="number" placeholder="如：420" step="0.01">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">买入日期</label>
+        <input class="form-input" id="h-date" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">类型</label>
+        <select class="form-input" id="h-type">
+          <option value="stock">股票</option>
+          <option value="etf">ETF</option>
+          <option value="bond-etf">债券ETF（IBTU）</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-holding-cancel">取消</button>
+      <button class="btn btn-primary" id="btn-holding-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：收入 -->
+<div class="modal-overlay" id="modal-income">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-title">收入记录</div>
+    <div class="form-group">
+      <label class="form-label">类型</label>
+      <select class="form-input" id="i-type">
+        <option value="interest">利息（如 IBTU）</option>
+        <option value="dividend">股息</option>
+        <option value="other">其他</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">来源</label>
+        <input class="form-input" id="i-ticker" type="text" placeholder="如：IBTU">
+      </div>
+      <div class="form-group">
+        <label class="form-label">金额 $</label>
+        <input class="form-input" id="i-amount" type="number" placeholder="如：195" step="0.01">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">日期</label>
+      <input class="form-input" id="i-date" type="date">
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注</label>
+      <input class="form-input" id="i-note" type="text" placeholder="如：IBTU 3月派息">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-income-cancel">取消</button>
+      <button class="btn btn-primary" id="btn-income-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="main.js"></script>
 </body>
 </html>
