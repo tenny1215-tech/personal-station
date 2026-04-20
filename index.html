@@ -77,7 +77,7 @@
   </div>
 </div>
 
-<!-- 弹窗：转账（重新设计） -->
+<!-- 弹窗：转账 -->
 <div class="modal-overlay" id="modal-transfer">
   <div class="modal-box">
     <div class="modal-handle"></div>
@@ -117,6 +117,16 @@
         <input class="form-input" id="t-wire-fee" type="number" placeholder="如：159.72" step="0.01">
       </div>
     </div>
+    <!-- ✅ 新增：汇丰剩余余额 -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">汇丰剩余余额 $</label>
+        <input class="form-input" id="t-hsbc-remaining" type="number" placeholder="未全转走时填写" step="0.01">
+      </div>
+      <div class="form-group">
+        <!-- 空位，保持对齐 -->
+      </div>
+    </div>
 
     <!-- 第三步 -->
     <div class="step-header">
@@ -148,6 +158,26 @@
       <div class="form-group">
         <label class="form-label">备注（可选）</label>
         <input class="form-input" id="t-note" type="text" placeholder="如：第一笔">
+      </div>
+    </div>
+
+    <!-- ✅ 新增：上传截图/凭证 -->
+    <div class="form-group" style="margin-top:4px">
+      <label class="form-label">📎 上传截图 / 凭证（可选）</label>
+      <label class="upload-label" id="upload-label" for="t-file">
+        <span class="upload-icon">🖼️</span>
+        <span id="upload-text">点击选择图片或 PDF</span>
+        <input type="file" id="t-file" accept="image/*,.pdf" style="display:none">
+      </label>
+      <div id="upload-preview"></div>
+      <!-- 编辑时已有附件的提示 -->
+      <div id="existing-attachment" style="display:none"></div>
+    </div>
+    <!-- 上传进度条 -->
+    <div id="upload-progress-wrap" style="display:none;margin-top:6px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px">上传中…</div>
+      <div style="background:var(--card2);border-radius:6px;height:6px;overflow:hidden">
+        <div id="upload-progress-bar" style="height:100%;width:0%;background:var(--accent);transition:width 0.3s"></div>
       </div>
     </div>
 

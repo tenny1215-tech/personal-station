@@ -1,0 +1,55 @@
+/* ── 追加到 style.css 末尾 ────────────────────────────── */
+
+/* 上传区域 */
+.upload-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px dashed var(--border, #333);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--card2, #1a1a1a);
+  transition: border-color 0.2s;
+  margin-top: 4px;
+}
+.upload-label:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.upload-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* 转账卡片里的附件行 */
+.attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--card2, #1a1a1a);
+  border-radius: 8px;
+}
+.attachment-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.attachment-thumb {
+  max-height: 80px;
+  max-width: 100%;
+  border-radius: 6px;
+  object-fit: contain;
+  display: block;
+  cursor: pointer;
+}
+.attachment-link {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+.attachment-link:hover { text-decoration: underline; }

@@ -3,6 +3,10 @@ import {
   getFirestore, collection, addDoc, deleteDoc, doc,
   onSnapshot, orderBy, query, serverTimestamp, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// ✅ 新增 Firebase Storage 引入
+import {
+  getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfx9IxuT4hW7h24wY6IZ0TGW1pxqe5N-M",
@@ -12,7 +16,11 @@ const firebaseConfig = {
   messagingSenderId: "16967737691",
   appId: "1:16967737691:web:53834006c3a385a7b63a7e"
 };
-const db = getFirestore(initializeApp(firebaseConfig));
+
+// ✅ 保存 app 引用，Storage 需要用到
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
 // ── 密码锁 ────────────────────────────────────────────────
 const PASSWORD = "1215";
@@ -31,16 +39,11 @@ document.getElementById("lock-btn").addEventListener("click", () => {
   }
 });
 document.getElementById("lock-input").addEventListener("keydown", e => { if(e.key==="Enter") document.getElementById("lock-btn").click(); });
-document.getElementById("logout-btn").addEventListener("click", () => { 
-  // 1. 清除本地授权状态
-  sessionStorage.removeItem("ivt_auth"); 
-  
-  // 2. 清空当前内存中的数据，防止闪现旧账本
-  transfers = {}; 
-  holdings = {}; 
-  income = {}; 
-  
-  // 3. 彻底重定向到首页，强制刷新所有状态
+document.getElementById("logout-btn").addEventListener("click", () => {
+  sessionStorage.removeItem("ivt_auth");
+  transfers = {};
+  holdings = {};
+  income = {};
   window.location.replace(window.location.origin + window.location.pathname);
 });
 if (checkAuth()) unlock();
@@ -95,25 +98,65 @@ function listenIncome() {
   });
 }
 
+// ── ✅ Firebase Storage 上传 ───────────────────────────────
+function uploadFile(file, date) {
+  return new Promise((resolve, reject) => {
+    const ext = file.name.split('.').pop();
+    const path = `transfers/${date}-${Date.now()}.${ext}`;
+    const fileRef = storageRef(storage, path);
+    const task = uploadBytesResumable(fileRef, file);
+
+    const progressWrap = document.getElementById("upload-progress-wrap");
+    const progressBar = document.getElementById("upload-progress-bar");
+    progressWrap.style.display = "block";
+
+    task.on("state_changed",
+      snapshot => {
+        const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        progressBar.style.width = pct + "%";
+      },
+      err => {
+        progressWrap.style.display = "none";
+        reject(err);
+      },
+      async () => {
+        progressWrap.style.display = "none";
+        const url = await getDownloadURL(task.snapshot.ref);
+        resolve({ url, path });
+      }
+    );
+  });
+}
+
 // ── 转账表单 ──────────────────────────────────────────────
 function resetTransferForm() {
   document.getElementById("t-edit-id").value = "";
-  ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-ibkr","t-ibkr-fee","t-note"].forEach(id=>{
+  ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-hsbc-remaining","t-ibkr","t-ibkr-fee","t-note"].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value="";
   });
   document.getElementById("t-date").value = today();
   document.getElementById("t-preview").style.display = "none";
   document.getElementById("calc-rate").textContent = "填写以上两栏自动计算汇率";
   document.getElementById("calc-rate").classList.remove("active");
+
+  // ✅ 清空文件上传区域
+  document.getElementById("t-file").value = "";
+  document.getElementById("upload-text").textContent = "点击选择图片或 PDF";
+  document.getElementById("upload-preview").innerHTML = "";
+  document.getElementById("existing-attachment").style.display = "none";
+  document.getElementById("existing-attachment").innerHTML = "";
+  document.getElementById("upload-progress-wrap").style.display = "none";
+  document.getElementById("upload-progress-bar").style.width = "0%";
 }
 
 function calcPreview() {
-  const usdBought = parseFloat(document.getElementById("t-usd-bought").value)||0;
-  const cnySpent  = parseFloat(document.getElementById("t-cny-spent").value)||0;
-  const usdSent   = parseFloat(document.getElementById("t-usd-sent").value)||0;
-  const wireFee   = parseFloat(document.getElementById("t-wire-fee").value)||0;   // CNY
-  const ibkr      = parseFloat(document.getElementById("t-ibkr").value)||0;
-  const ibkrFee   = parseFloat(document.getElementById("t-ibkr-fee").value)||0;
+  const usdBought      = parseFloat(document.getElementById("t-usd-bought").value)||0;
+  const cnySpent       = parseFloat(document.getElementById("t-cny-spent").value)||0;
+  const usdSent        = parseFloat(document.getElementById("t-usd-sent").value)||0;
+  const wireFee        = parseFloat(document.getElementById("t-wire-fee").value)||0;
+  const hsbcRemaining  = parseFloat(document.getElementById("t-hsbc-remaining").value)||0;
+  const ibkr           = parseFloat(document.getElementById("t-ibkr").value)||0;
+  const ibkrFee        = parseFloat(document.getElementById("t-ibkr-fee").value)||0;
 
   // 计算汇率
   const rateEl = document.getElementById("calc-rate");
@@ -126,64 +169,87 @@ function calcPreview() {
     rateEl.classList.remove("active");
   }
 
-  // 汇总预览
   const preview = document.getElementById("t-preview");
   if (!usdBought || !cnySpent) { preview.style.display="none"; return; }
 
   const rate = cnySpent / usdBought;
-  // 汇款手续费折算成美金
-  const wireFeeUSD = wireFee > 0 ? wireFee / rate : 0;
-  // 总人民币支出
   const totalCNY = cnySpent + wireFee;
-  // 总美金成本（人民币总支出 / 汇率）
   const totalUSDCost = totalCNY / rate;
-  // 实际损耗（买了多少 - 到账多少）
-  const loss = usdBought - (ibkr || usdSent || usdBought);
+  const ibkrArrived = ibkr || usdSent || usdBought;
+  const loss = usdBought - ibkrArrived - hsbcRemaining;
 
   document.getElementById("t-preview-content").innerHTML =
     `<div><div class="p-label">实际汇率</div><div class="p-value" style="color:var(--accent)">${rate.toFixed(4)}</div></div>`+
     `<div><div class="p-label">总人民币支出</div><div class="p-value" style="color:var(--red)">¥${f0(totalCNY)}</div></div>`+
     `<div><div class="p-label">等值美金成本</div><div class="p-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</div></div>`+
     `<div><div class="p-label">IBKR 实际到账</div><div class="p-value" style="color:var(--green)">$${f2(ibkr||0)}</div></div>`+
-    (loss>0 ? `<div style="grid-column:span 2"><div class="p-label">中途损耗</div><div class="p-value" style="color:var(--red)">-$${f2(loss)}（含所有手续费）</div></div>` : "");
+    (hsbcRemaining > 0 ? `<div><div class="p-label">汇丰留存</div><div class="p-value" style="color:var(--accent)">$${f2(hsbcRemaining)}</div></div>` : "")+
+    (loss > 0.005 ? `<div style="grid-column:span 2"><div class="p-label">中途损耗（手续费等）</div><div class="p-value" style="color:var(--red)">-$${f2(loss)}</div></div>` : "");
   preview.style.display = "block";
 }
 
 async function saveTransfer() {
-  const editId = document.getElementById("t-edit-id").value; // 1. 获取 ID
-
-  const usdBought = parseFloat(document.getElementById("t-usd-bought").value)||0;
-  const cnySpent  = parseFloat(document.getElementById("t-cny-spent").value)||0;
-  const usdSent   = parseFloat(document.getElementById("t-usd-sent").value)||0;
-  const wireFee   = parseFloat(document.getElementById("t-wire-fee").value)||0;
-  const ibkr      = parseFloat(document.getElementById("t-ibkr").value)||0;
-  const ibkrFee   = parseFloat(document.getElementById("t-ibkr-fee").value)||0;
-  const date      = document.getElementById("t-date").value;
-  const note      = document.getElementById("t-note").value;
+  const editId        = document.getElementById("t-edit-id").value;
+  const usdBought     = parseFloat(document.getElementById("t-usd-bought").value)||0;
+  const cnySpent      = parseFloat(document.getElementById("t-cny-spent").value)||0;
+  const usdSent       = parseFloat(document.getElementById("t-usd-sent").value)||0;
+  const wireFee       = parseFloat(document.getElementById("t-wire-fee").value)||0;
+  const hsbcRemaining = parseFloat(document.getElementById("t-hsbc-remaining").value)||0;
+  const ibkr          = parseFloat(document.getElementById("t-ibkr").value)||0;
+  const ibkrFee       = parseFloat(document.getElementById("t-ibkr-fee").value)||0;
+  const date          = document.getElementById("t-date").value;
+  const note          = document.getElementById("t-note").value;
+  const fileInput     = document.getElementById("t-file");
 
   if (!usdBought||!cnySpent) { alert("请填写购买美金和花费人民币"); return; }
   if (!ibkr) { alert("请填写IBKR到账金额"); return; }
 
-  const rate = +(cnySpent / usdBought).toFixed(4);
-  const wireFeeUSD = wireFee > 0 ? +(wireFee / rate).toFixed(2) : 0;
-  const totalCNY = +(cnySpent + wireFee).toFixed(2);
+  const rate         = +(cnySpent / usdBought).toFixed(4);
+  const totalCNY     = +(cnySpent + wireFee).toFixed(2);
   const totalUSDCost = +(totalCNY / rate).toFixed(2);
 
-  const payload = {
-    usdBought, cnySpent, usdSent, wireFee, wireFeeUSD,
-    ibkr, ibkrFee, rate, totalCNY, totalUSDCost,
-    date, note
-  };
+  // ✅ 禁用按钮，防止重复提交
+  const saveBtn = document.getElementById("btn-transfer-save");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "保存中…";
 
-  // 2. 根据是否有 editId 来决定是“更新”还是“新增”
-  if (editId) {
-    await updateDoc(doc(db, "transfers", editId), payload);
-  } else {
-    await addDoc(collection(db, "transfers"), { ...payload, createdAt: serverTimestamp() });
+  try {
+    let attachmentUrl  = editId ? (transfers[editId]?.attachmentUrl  || null) : null;
+    let attachmentPath = editId ? (transfers[editId]?.attachmentPath || null) : null;
+    let attachmentName = editId ? (transfers[editId]?.attachmentName || null) : null;
+
+    // ✅ 如果有新文件，上传
+    if (fileInput.files && fileInput.files[0]) {
+      const file = fileInput.files[0];
+      const result = await uploadFile(file, date);
+      attachmentUrl  = result.url;
+      attachmentPath = result.path;
+      attachmentName = file.name;
+    }
+
+    const payload = {
+      usdBought, cnySpent, usdSent, wireFee, hsbcRemaining,
+      ibkr, ibkrFee, rate, totalCNY, totalUSDCost,
+      date, note,
+      attachmentUrl,
+      attachmentPath,
+      attachmentName
+    };
+
+    if (editId) {
+      await updateDoc(doc(db, "transfers", editId), payload);
+    } else {
+      await addDoc(collection(db, "transfers"), { ...payload, createdAt: serverTimestamp() });
+    }
+
+    closeModal("transfer");
+    resetTransferForm();
+  } catch(e) {
+    alert("保存失败：" + e.message);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "保存";
   }
-
-  closeModal("transfer");
-  resetTransferForm(); // 这里会执行你刚加好的清空逻辑
 }
 
 // ── 持仓 ──────────────────────────────────────────────────
@@ -213,7 +279,15 @@ async function saveHolding() {
 }
 async function updateCurrentPrice(id,val) { await updateDoc(doc(db,"holdings",id),{current:parseFloat(val)||0}); }
 async function deleteHolding(id) { if(!confirm("删除这条持仓？"))return; await deleteDoc(doc(db,"holdings",id)); }
-async function deleteTransfer(id) { if(!confirm("删除这条转账记录？"))return; await deleteDoc(doc(db,"transfers",id)); }
+async function deleteTransfer(id) {
+  if(!confirm("删除这条转账记录？"))return;
+  // ✅ 如果有附件，同步删除 Storage 文件
+  const t = transfers[id];
+  if (t?.attachmentPath) {
+    try { await deleteObject(storageRef(storage, t.attachmentPath)); } catch(e) { /* 忽略已删除文件 */ }
+  }
+  await deleteDoc(doc(db,"transfers",id));
+}
 
 // ── 收入 ──────────────────────────────────────────────────
 function resetIncomeForm() {
@@ -303,34 +377,56 @@ function renderTransfers() {
     <div class="tm-grid">
       <div><div class="tm-label">汇出美金</div><div class="tm-value">$${f2(t.usdSent||0)}</div></div>
       <div><div class="tm-label">IBKR手续费</div><div class="tm-value" style="color:var(--red)">$${f2(t.ibkrFee||0)}</div></div>
+      ${(t.hsbcRemaining > 0) ? `<div><div class="tm-label">汇丰留存</div><div class="tm-value" style="color:var(--accent)">$${f2(t.hsbcRemaining)}</div></div>` : ""}
     </div>
     <div style="background:var(--card2);border-radius:10px;padding:10px 12px;margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div><div class="tm-label">总人民币支出</div><div class="tm-value" style="color:var(--red)">¥${f0(t.totalCNY)}</div></div>
       <div><div class="tm-label">等值美金成本</div><div class="tm-value" style="color:var(--yellow)">$${f2(t.totalUSDCost)}</div></div>
     </div>
+    ${t.attachmentUrl ? `
+    <div class="attachment-row">
+      <span class="attachment-icon">📎</span>
+      ${t.attachmentName && t.attachmentName.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+        ? `<a href="${t.attachmentUrl}" target="_blank" rel="noopener">
+             <img src="${t.attachmentUrl}" class="attachment-thumb" alt="凭证">
+           </a>`
+        : `<a href="${t.attachmentUrl}" target="_blank" rel="noopener" class="attachment-link">${t.attachmentName||"查看附件"}</a>`
+      }
+    </div>` : ""}
   </div>`).join("");
 
   el.querySelectorAll("[data-del-transfer]").forEach(btn=>{
     btn.addEventListener("click",()=>deleteTransfer(btn.dataset.delTransfer));
   });
 
-  // 关键：绑定编辑按钮的点击事件
   el.querySelectorAll("[data-edit-transfer]").forEach(btn=>{
     btn.addEventListener("click",()=>{
       const t = transfers[btn.dataset.editTransfer];
       if(!t) return;
-      // 把数据塞回弹窗表单
-      document.getElementById("t-edit-id").value = t.id;
-      document.getElementById("t-usd-bought").value = t.usdBought;
-      document.getElementById("t-cny-spent").value = t.cnySpent;
-      document.getElementById("t-usd-sent").value = t.usdSent || "";
-      document.getElementById("t-wire-fee").value = t.wireFee || "";
-      document.getElementById("t-ibkr").value = t.ibkr;
-      document.getElementById("t-ibkr-fee").value = t.ibkrFee || "";
-      document.getElementById("t-date").value = t.date;
-      document.getElementById("t-note").value = t.note || "";
-      
-      calcPreview(); // 触发预览计算
+      document.getElementById("t-edit-id").value       = t.id;
+      document.getElementById("t-usd-bought").value    = t.usdBought;
+      document.getElementById("t-cny-spent").value     = t.cnySpent;
+      document.getElementById("t-usd-sent").value      = t.usdSent || "";
+      document.getElementById("t-wire-fee").value      = t.wireFee || "";
+      document.getElementById("t-hsbc-remaining").value= t.hsbcRemaining || "";
+      document.getElementById("t-ibkr").value          = t.ibkr;
+      document.getElementById("t-ibkr-fee").value      = t.ibkrFee || "";
+      document.getElementById("t-date").value          = t.date;
+      document.getElementById("t-note").value          = t.note || "";
+
+      // ✅ 显示已有附件提示
+      const existingEl = document.getElementById("existing-attachment");
+      if (t.attachmentUrl) {
+        existingEl.style.display = "block";
+        existingEl.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-top:6px">
+          已有附件：<a href="${t.attachmentUrl}" target="_blank" rel="noopener" style="color:var(--accent)">${t.attachmentName||"查看附件"}</a>
+          <span style="color:var(--muted)">（重新选择文件将替换旧附件）</span>
+        </div>`;
+      } else {
+        existingEl.style.display = "none";
+      }
+
+      calcPreview();
       openModal("transfer");
     });
   });
@@ -427,8 +523,25 @@ function initApp() {
 
   document.getElementById("btn-transfer-cancel").addEventListener("click",()=>closeModal("transfer"));
   document.getElementById("btn-transfer-save").addEventListener("click",saveTransfer);
-  ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-ibkr","t-ibkr-fee"].forEach(id=>{
+  ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-hsbc-remaining","t-ibkr","t-ibkr-fee"].forEach(id=>{
     document.getElementById(id).addEventListener("input",calcPreview);
+  });
+
+  // ✅ 文件选择预览
+  document.getElementById("t-file").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById("upload-text").textContent = file.name;
+    const preview = document.getElementById("upload-preview");
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        preview.innerHTML = `<img src="${ev.target.result}" style="max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;object-fit:contain;">`;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      preview.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-top:6px">📄 ${file.name}</div>`;
+    }
   });
 
   document.getElementById("btn-holding-cancel").addEventListener("click",()=>closeModal("holding"));
