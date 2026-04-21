@@ -4,8 +4,6 @@ import {
   onSnapshot, orderBy, query, serverTimestamp, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ✅ 不需要 Firebase Storage，图片直接压缩成 Base64 存 Firestore
-
 const firebaseConfig = {
   apiKey: "AIzaSyAfx9IxuT4hW7h24wY6IZ0TGW1pxqe5N-M",
   authDomain: "personal-station-810e7.firebaseapp.com",
@@ -94,8 +92,7 @@ function listenIncome() {
   });
 }
 
-// ── ✅ 图片压缩 → Base64（存入 Firestore） ─────────────────
-// 压缩到最长边 1200px，JPEG 质量 0.72，一般截图压缩后 150~400KB
+// ── 图片压缩 → Base64 ─────────────────────────────────────
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
@@ -115,14 +112,12 @@ function compressImage(file) {
           else { w = Math.round(w * MAX / h); h = MAX; }
         }
         const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
+        canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
         const base64 = canvas.toDataURL("image/jpeg", 0.72);
-        // 粗略估算大小：base64 长度 * 0.75 = 字节数
         const sizeKB = Math.round(base64.length * 0.75 / 1024);
         if (sizeKB > 900) {
-          reject(new Error(`图片压缩后仍有 ${sizeKB}KB，超过 Firestore 限制，请换一张截图`));
+          reject(new Error(`图片压缩后仍有 ${sizeKB}KB，超过限制，请换一张截图`));
           return;
         }
         resolve(base64);
@@ -144,7 +139,6 @@ function resetTransferForm() {
   document.getElementById("t-preview").style.display = "none";
   document.getElementById("calc-rate").textContent = "填写以上两栏自动计算汇率";
   document.getElementById("calc-rate").classList.remove("active");
-  // 清空上传区
   document.getElementById("t-file").value = "";
   document.getElementById("upload-text").textContent = "点击选择图片（自动压缩后保存）";
   document.getElementById("upload-preview").innerHTML = "";
@@ -155,7 +149,6 @@ function resetTransferForm() {
 function calcPreview() {
   const usdBought     = parseFloat(document.getElementById("t-usd-bought").value)||0;
   const cnySpent      = parseFloat(document.getElementById("t-cny-spent").value)||0;
-  const usdSent       = parseFloat(document.getElementById("t-usd-sent").value)||0;
   const wireFee       = parseFloat(document.getElementById("t-wire-fee").value)||0;
   const hsbcRemaining = parseFloat(document.getElementById("t-hsbc-remaining").value)||0;
   const ibkr          = parseFloat(document.getElementById("t-ibkr").value)||0;
@@ -172,23 +165,25 @@ function calcPreview() {
   }
 
   const preview = document.getElementById("t-preview");
-  if (!usdBought || !cnySpent) { preview.style.display = "none"; return; }
+  if (!ibkr) { preview.style.display = "none"; return; }
 
-  const rate         = cnySpent / usdBought;
+  const rate         = usdBought > 0 && cnySpent > 0 ? cnySpent / usdBought : 0;
   const totalCNY     = cnySpent + wireFee;
-  const totalUSDCost = totalCNY / rate;
-  const ibkrArrived  = ibkr || usdSent || usdBought;
-  // 损耗 = 买了多少 - IBKR到账 - 汇丰留存 - 电汇费
-  const loss = usdBought - ibkrArrived - hsbcRemaining - ibkrFee;
+  const totalUSDCost = rate > 0 ? totalCNY / rate : 0;
+
+  // 损耗计算：有换汇数据用总成本算，没有就只算电汇手续费
+  const loss = totalUSDCost > 0
+    ? totalUSDCost - ibkr - hsbcRemaining
+    : ibkrFee;
 
   document.getElementById("t-preview-content").innerHTML =
-    `<div><div class="p-label">实际汇率</div><div class="p-value" style="color:var(--accent)">${rate.toFixed(4)}</div></div>`+
-    `<div><div class="p-label">总人民币支出</div><div class="p-value" style="color:var(--red)">¥${f0(totalCNY)}</div></div>`+
-    `<div><div class="p-label">等值美金成本</div><div class="p-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</div></div>`+
-    `<div><div class="p-label">IBKR 实际到账</div><div class="p-value" style="color:var(--green)">$${f2(ibkr||0)}</div></div>`+
+    (rate > 0 ? `<div><div class="p-label">实际汇率</div><div class="p-value" style="color:var(--accent)">${rate.toFixed(4)}</div></div>` : "")+
+    (totalCNY > 0 ? `<div><div class="p-label">总人民币支出</div><div class="p-value" style="color:var(--red)">¥${f0(totalCNY)}</div></div>` : "")+
+    (totalUSDCost > 0 ? `<div><div class="p-label">等值美金成本</div><div class="p-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</div></div>` : "")+
+    `<div><div class="p-label">IBKR 实际到账</div><div class="p-value" style="color:var(--green)">$${f2(ibkr)}</div></div>`+
     (hsbcRemaining > 0 ? `<div><div class="p-label">汇丰留存</div><div class="p-value" style="color:var(--accent)">$${f2(hsbcRemaining)}</div></div>` : "")+
     (ibkrFee > 0 ? `<div><div class="p-label">电汇手续费</div><div class="p-value" style="color:var(--red)">-$${f2(ibkrFee)}</div></div>` : "")+
-    (loss > 0.01 ? `<div style="grid-column:span 2"><div class="p-label">其他损耗</div><div class="p-value" style="color:var(--red)">-$${f2(loss)}</div></div>` : "");
+    (loss > 0.01 ? `<div style="grid-column:span 2"><div class="p-label">💸 手续费损耗</div><div class="p-value" style="color:var(--red)">-$${f2(loss)}</div></div>` : "");
   preview.style.display = "block";
 }
 
@@ -207,18 +202,16 @@ async function saveTransfer() {
 
   if (!ibkr) { alert("请填写 IBKR 到账金额"); return; }
 
-  const rate         = +(cnySpent / usdBought).toFixed(4);
+  const rate         = usdBought > 0 && cnySpent > 0 ? +(cnySpent / usdBought).toFixed(4) : 0;
   const totalCNY     = +(cnySpent + wireFee).toFixed(2);
-  const totalUSDCost = +(totalCNY / rate).toFixed(2);
+  const totalUSDCost = rate > 0 ? +(totalCNY / rate).toFixed(2) : 0;
 
   const saveBtn = document.getElementById("btn-transfer-save");
   saveBtn.disabled = true;
   saveBtn.textContent = "保存中…";
 
   try {
-    // ✅ Base64：如有新图片则压缩，否则保留旧值
     let attachmentBase64 = editId ? (transfers[editId]?.attachmentBase64 || null) : null;
-
     if (fileInput.files && fileInput.files[0]) {
       saveBtn.textContent = "压缩图片中…";
       attachmentBase64 = await compressImage(fileInput.files[0]);
@@ -227,8 +220,7 @@ async function saveTransfer() {
     const payload = {
       usdBought, cnySpent, usdSent, wireFee, hsbcRemaining,
       ibkr, ibkrFee, rate, totalCNY, totalUSDCost,
-      date, note,
-      attachmentBase64   // ✅ 直接存图片 base64 字符串
+      date, note, attachmentBase64
     };
 
     if (editId) {
@@ -281,7 +273,6 @@ async function deleteHolding(id) {
 }
 async function deleteTransfer(id) {
   if (!confirm("删除这条转账记录？")) return;
-  // ✅ Base64 方案：删 Firestore 文档就够了，无需删 Storage
   await deleteDoc(doc(db,"transfers",id));
 }
 
@@ -361,7 +352,15 @@ function renderTransfers() {
     return;
   }
 
-  el.innerHTML = arr.map(t => `<div class="transfer-card">
+  el.innerHTML = arr.map(t => {
+    // ── 损耗计算 ──────────────────────────────────────────
+    // 有换汇数据：总成本 - IBKR到账 - 汇丰留存
+    // 无换汇数据（旧记录）：只算电汇手续费
+    const loss = t.totalUSDCost > 0
+      ? t.totalUSDCost - t.ibkr - (t.hsbcRemaining||0)
+      : (t.ibkrFee||0);
+
+    return `<div class="transfer-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
       <div>
         <div style="font-size:15px;font-weight:700;color:var(--accent)">$${f2(t.ibkr)} 到账 IBKR</div>
@@ -376,25 +375,23 @@ function renderTransfers() {
     <div class="tm-grid">
       <div><div class="tm-label">购买美金</div><div class="tm-value">$${f2(t.usdBought)}</div></div>
       <div><div class="tm-label">花费人民币</div><div class="tm-value">¥${f0(t.cnySpent)}</div></div>
-      <div><div class="tm-label">实际汇率</div><div class="tm-value" style="color:var(--accent)">${t.rate}</div></div>
+      <div><div class="tm-label">实际汇率</div><div class="tm-value" style="color:var(--accent)">${t.rate > 0 ? t.rate : "—"}</div></div>
       <div><div class="tm-label">邮电+手续费</div><div class="tm-value" style="color:var(--red)">¥${f2(t.wireFee||0)}</div></div>
     </div>
     <div class="step-mini">② 汇出 → ③ 到账</div>
     <div class="tm-grid">
       <div><div class="tm-label">汇出美金</div><div class="tm-value">$${f2(t.usdSent||0)}</div></div>
-      <!-- ✅ 改名：电汇手续费 -->
       <div><div class="tm-label">电汇手续费</div><div class="tm-value" style="color:var(--red)">$${f2(t.ibkrFee||0)}</div></div>
-      ${(t.hsbcRemaining > 0) ? `<div><div class="tm-label">汇丰留存</div><div class="tm-value" style="color:var(--accent)">$${f2(t.hsbcRemaining)}</div></div>` : ""}
+      ${t.hsbcRemaining > 0 ? `<div><div class="tm-label">汇丰留存</div><div class="tm-value" style="color:var(--accent)">$${f2(t.hsbcRemaining)}</div></div>` : ""}
     </div>
     <div style="background:var(--card2);border-radius:10px;padding:10px 12px;margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div><div class="tm-label">总人民币支出</div><div class="tm-value" style="color:var(--red)">¥${f0(t.totalCNY)}</div></div>
       <div><div class="tm-label">等值美金成本</div><div class="tm-value" style="color:var(--yellow)">$${f2(t.totalUSDCost)}</div></div>
     </div>
     <div style="background:var(--card2);border-radius:10px;padding:8px 12px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-  <div class="tm-label">💸 手续费损耗</div>
-  <div class="tm-value" style="color:var(--red)">-$${f2(t.totalUSDCost - t.ibkr - (t.hsbcRemaining||0))}</div>
-</div>
-    <!-- ✅ 附件：Base64 图片直接内嵌显示 -->
+      <div class="tm-label">💸 手续费损耗</div>
+      <div class="tm-value" style="color:var(--red)">-$${f2(loss)}</div>
+    </div>
     ${t.attachmentBase64 ? `
     <div class="attachment-row">
       <span class="attachment-icon">📎</span>
@@ -402,7 +399,8 @@ function renderTransfers() {
            onclick="this.classList.toggle('attachment-thumb-full')">
       <span style="font-size:11px;color:var(--muted)">点击图片放大</span>
     </div>` : ""}
-  </div>`).join("");
+  </div>`;
+  }).join("");
 
   el.querySelectorAll("[data-del-transfer]").forEach(btn => {
     btn.addEventListener("click", () => deleteTransfer(btn.dataset.delTransfer));
@@ -413,8 +411,8 @@ function renderTransfers() {
       const t = transfers[btn.dataset.editTransfer];
       if (!t) return;
       document.getElementById("t-edit-id").value        = t.id;
-      document.getElementById("t-usd-bought").value     = t.usdBought;
-      document.getElementById("t-cny-spent").value      = t.cnySpent;
+      document.getElementById("t-usd-bought").value     = t.usdBought || "";
+      document.getElementById("t-cny-spent").value      = t.cnySpent || "";
       document.getElementById("t-usd-sent").value       = t.usdSent || "";
       document.getElementById("t-wire-fee").value       = t.wireFee || "";
       document.getElementById("t-hsbc-remaining").value = t.hsbcRemaining || "";
@@ -423,7 +421,6 @@ function renderTransfers() {
       document.getElementById("t-date").value           = t.date;
       document.getElementById("t-note").value           = t.note || "";
 
-      // ✅ 显示已有截图缩略图
       const existingEl = document.getElementById("existing-attachment");
       if (t.attachmentBase64) {
         existingEl.style.display = "block";
@@ -449,10 +446,10 @@ function renderHoldings() {
     return;
   }
   el.innerHTML = arr.map(h => {
-    const cost     = h.price*h.shares+(h.commission||0);
-    const mkt      = (h.current||h.price)*h.shares;
-    const pnl      = mkt - cost;
-    const pct      = cost > 0 ? (pnl/cost*100) : 0;
+    const cost      = h.price*h.shares+(h.commission||0);
+    const mkt       = (h.current||h.price)*h.shares;
+    const pnl       = mkt - cost;
+    const pct       = cost > 0 ? (pnl/cost*100) : 0;
     const typeLabel = h.type==="bond-etf" ? "债券ETF" : h.type==="etf" ? "ETF" : "股票";
     const tagCls    = h.type==="bond-etf" ? "tag-yellow" : "tag-blue";
     return `<div class="holding-card">
@@ -544,7 +541,6 @@ function initApp() {
     document.getElementById(id).addEventListener("input", calcPreview);
   });
 
-  // ✅ 选图片后立即本地预览
   document.getElementById("t-file").addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
