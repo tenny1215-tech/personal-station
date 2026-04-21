@@ -391,6 +391,10 @@ function renderTransfers() {
       <div><div class="tm-label">总人民币支出</div><div class="tm-value" style="color:var(--red)">¥${f0(t.totalCNY)}</div></div>
       <div><div class="tm-label">等值美金成本</div><div class="tm-value" style="color:var(--yellow)">$${f2(t.totalUSDCost)}</div></div>
     </div>
+    <div style="background:var(--card2);border-radius:10px;padding:8px 12px;margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+  <div class="tm-label">💸 手续费损耗</div>
+  <div class="tm-value" style="color:var(--red)">-$${f2(t.totalUSDCost - t.ibkr - (t.hsbcRemaining||0))}</div>
+</div>
     <!-- ✅ 附件：Base64 图片直接内嵌显示 -->
     ${t.attachmentBase64 ? `
     <div class="attachment-row">
