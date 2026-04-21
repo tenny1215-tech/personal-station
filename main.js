@@ -351,8 +351,18 @@ function renderTransfers() {
     el.innerHTML = `<div class="empty"><div class="empty-icon">💸</div><div class="empty-text">还没有转账记录<br>点右下角 ＋ 添加</div></div>`;
     return;
   }
-
-  el.innerHTML = arr.map(t => {
+const totalIBKR = arr.reduce((s,t) => s + t.ibkr, 0);
+const totalLoss = arr.reduce((s,t) => {
+  const loss = t.totalUSDCost > 0
+    ? t.totalUSDCost - t.ibkr - (t.hsbcRemaining||0)
+    : (t.ibkrFee||0);
+  return s + loss;
+}, 0);
+  
+ el.innerHTML = `<div style="background:var(--card2);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+  <div><div class="tm-label">总到账 IBKR</div><div style="font-size:18px;font-weight:700;color:var(--accent)">$${f2(totalIBKR)}</div></div>
+  <div><div class="tm-label">累计手续费损耗</div><div style="font-size:18px;font-weight:700;color:var(--red)">-$${f2(totalLoss)}</div></div>
+</div>` + arr.map(t => {
     // ── 损耗计算 ──────────────────────────────────────────
     // 有换汇数据：总成本 - IBKR到账 - 汇丰留存
     // 无换汇数据（旧记录）：只算电汇手续费
