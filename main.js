@@ -205,7 +205,7 @@ async function saveTransfer() {
   const note          = document.getElementById("t-note").value;
   const fileInput     = document.getElementById("t-file");
 
-  if (!usdBought || !cnySpent) { alert("请填写购买美金和花费人民币"); return; }
+  if (!ibkr) { alert("请填写IBKR到账金额"); return; }
   if (!ibkr) { alert("请填写 IBKR 到账金额"); return; }
 
   const rate         = +(cnySpent / usdBought).toFixed(4);
