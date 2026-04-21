@@ -96,8 +96,7 @@ function listenIncome() {
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
-      reject(new Error("只支持图片格式（jpg/png/webp）"));
-      return;
+      reject(new Error("只支持图片格式（jpg/png/webp）")); return;
     }
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("读取文件失败"));
@@ -117,8 +116,7 @@ function compressImage(file) {
         const base64 = canvas.toDataURL("image/jpeg", 0.72);
         const sizeKB = Math.round(base64.length * 0.75 / 1024);
         if (sizeKB > 900) {
-          reject(new Error(`图片压缩后仍有 ${sizeKB}KB，超过限制，请换一张截图`));
-          return;
+          reject(new Error(`图片压缩后仍有 ${sizeKB}KB，请换一张截图`)); return;
         }
         resolve(base64);
       };
@@ -126,6 +124,44 @@ function compressImage(file) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+// ── ✅ 实时股价：调用 Vercel API ──────────────────────────
+async function fetchPrice(ticker) {
+  try {
+    const r = await fetch(`/api/price?ticker=${encodeURIComponent(ticker)}`);
+    const data = await r.json();
+    return data.price || null;
+  } catch(e) {
+    return null;
+  }
+}
+
+// 刷新单只股票价格
+async function refreshPrice(id) {
+  const h = holdings[id];
+  if (!h) return;
+  const btn = document.querySelector(`[data-refresh-id="${id}"]`);
+  if (btn) { btn.textContent = "⏳"; btn.disabled = true; }
+  const price = await fetchPrice(h.ticker);
+  if (price !== null) {
+    await updateCurrentPrice(id, price);
+  } else {
+    alert(`无法获取 ${h.ticker} 的价格，请稍后重试`);
+  }
+  if (btn) { btn.textContent = "🔄"; btn.disabled = false; }
+}
+
+// 一键刷新所有持仓价格
+async function refreshAllPrices() {
+  const btn = document.getElementById("btn-refresh-all");
+  if (btn) { btn.textContent = "刷新中…"; btn.disabled = true; }
+  const arr = Object.values(holdings);
+  for (const h of arr) {
+    const price = await fetchPrice(h.ticker);
+    if (price !== null) await updateCurrentPrice(h.id, price);
+  }
+  if (btn) { btn.textContent = "🔄 一键刷新全部价格"; btn.disabled = false; }
 }
 
 // ── 转账表单 ──────────────────────────────────────────────
@@ -170,8 +206,6 @@ function calcPreview() {
   const rate         = usdBought > 0 && cnySpent > 0 ? cnySpent / usdBought : 0;
   const totalCNY     = cnySpent + wireFee;
   const totalUSDCost = rate > 0 ? totalCNY / rate : 0;
-
-  // 损耗计算：有换汇数据用总成本算，没有就只算电汇手续费
   const loss = totalUSDCost > 0
     ? totalUSDCost - ibkr - hsbcRemaining
     : ibkrFee;
@@ -228,7 +262,6 @@ async function saveTransfer() {
     } else {
       await addDoc(collection(db, "transfers"), { ...payload, createdAt: serverTimestamp() });
     }
-
     closeModal("transfer");
     resetTransferForm();
   } catch(e) {
@@ -351,25 +384,22 @@ function renderTransfers() {
     el.innerHTML = `<div class="empty"><div class="empty-icon">💸</div><div class="empty-text">还没有转账记录<br>点右下角 ＋ 添加</div></div>`;
     return;
   }
-const totalIBKR = arr.reduce((s,t) => s + t.ibkr, 0);
-const totalLoss = arr.reduce((s,t) => {
-  const loss = t.totalUSDCost > 0
-    ? t.totalUSDCost - t.ibkr - (t.hsbcRemaining||0)
-    : (t.ibkrFee||0);
-  return s + loss;
-}, 0);
-  
- el.innerHTML = `<div style="background:var(--card2);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
-  <div><div class="tm-label">总到账 IBKR</div><div style="font-size:18px;font-weight:700;color:var(--accent)">$${f2(totalIBKR)}</div></div>
-  <div><div class="tm-label">累计手续费损耗</div><div style="font-size:18px;font-weight:700;color:var(--red)">-$${f2(totalLoss)}</div></div>
-</div>` + arr.map(t => {
-    // ── 损耗计算 ──────────────────────────────────────────
-    // 有换汇数据：总成本 - IBKR到账 - 汇丰留存
-    // 无换汇数据（旧记录）：只算电汇手续费
+
+  const totalIBKR = arr.reduce((s,t) => s + t.ibkr, 0);
+  const totalLoss = arr.reduce((s,t) => {
     const loss = t.totalUSDCost > 0
       ? t.totalUSDCost - t.ibkr - (t.hsbcRemaining||0)
       : (t.ibkrFee||0);
+    return s + loss;
+  }, 0);
 
+  el.innerHTML = `<div style="background:var(--card2);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div><div class="tm-label">总到账 IBKR</div><div style="font-size:18px;font-weight:700;color:var(--accent)">$${f2(totalIBKR)}</div></div>
+    <div><div class="tm-label">累计手续费损耗</div><div style="font-size:18px;font-weight:700;color:var(--red)">-$${f2(totalLoss)}</div></div>
+  </div>` + arr.map(t => {
+    const loss = t.totalUSDCost > 0
+      ? t.totalUSDCost - t.ibkr - (t.hsbcRemaining||0)
+      : (t.ibkrFee||0);
     return `<div class="transfer-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
       <div>
@@ -415,11 +445,9 @@ const totalLoss = arr.reduce((s,t) => {
   el.querySelectorAll("[data-del-transfer]").forEach(btn => {
     btn.addEventListener("click", () => deleteTransfer(btn.dataset.delTransfer));
   });
-
   el.querySelectorAll("[data-edit-transfer]").forEach(btn => {
     btn.addEventListener("click", () => {
-      const t = transfers[btn.dataset.editTransfer];
-      if (!t) return;
+      const t = transfers[btn.dataset.editTransfer]; if (!t) return;
       document.getElementById("t-edit-id").value        = t.id;
       document.getElementById("t-usd-bought").value     = t.usdBought || "";
       document.getElementById("t-cny-spent").value      = t.cnySpent || "";
@@ -430,7 +458,6 @@ const totalLoss = arr.reduce((s,t) => {
       document.getElementById("t-ibkr-fee").value       = t.ibkrFee || "";
       document.getElementById("t-date").value           = t.date;
       document.getElementById("t-note").value           = t.note || "";
-
       const existingEl = document.getElementById("existing-attachment");
       if (t.attachmentBase64) {
         existingEl.style.display = "block";
@@ -441,7 +468,6 @@ const totalLoss = arr.reduce((s,t) => {
       } else {
         existingEl.style.display = "none";
       }
-
       calcPreview();
       openModal("transfer");
     });
@@ -455,7 +481,13 @@ function renderHoldings() {
     el.innerHTML = `<div class="empty"><div class="empty-icon">📈</div><div class="empty-text">还没有持仓记录<br>点右下角 ＋ 添加</div></div>`;
     return;
   }
-  el.innerHTML = arr.map(h => {
+
+  // ✅ 一键刷新按钮
+  el.innerHTML = `<div style="margin-bottom:12px">
+    <button id="btn-refresh-all" style="width:100%;padding:10px;border-radius:10px;background:var(--card2);border:1px solid var(--border);color:var(--accent);font-size:14px;font-weight:600;cursor:pointer;">
+      🔄 一键刷新全部价格
+    </button>
+  </div>` + arr.map(h => {
     const cost      = h.price*h.shares+(h.commission||0);
     const mkt       = (h.current||h.price)*h.shares;
     const pnl       = mkt - cost;
@@ -476,12 +508,22 @@ function renderHoldings() {
         <div class="hd-item"><div class="hd-label">佣金</div><div class="hd-value" style="color:var(--red)">$${f2(h.commission||0)}</div></div>
       </div>
       <div class="price-row">
-        <input type="number" placeholder="更新当前价格" step="0.01" value="${h.current||""}" data-price-id="${h.id}">
+        <input type="number" placeholder="手动更新价格" step="0.01" value="${h.current||""}" data-price-id="${h.id}">
+        <!-- ✅ 单只刷新按钮 -->
+        <button class="btn-sm-ghost" data-refresh-id="${h.id}">🔄</button>
         <button class="btn-sm-ghost" data-edit-id="${h.id}">编辑</button>
         <button class="btn-sm-danger" data-del-holding="${h.id}">删除</button>
       </div>
     </div>`;
   }).join("");
+
+  // 一键刷新
+  document.getElementById("btn-refresh-all").addEventListener("click", refreshAllPrices);
+
+  // 单只刷新
+  el.querySelectorAll("[data-refresh-id]").forEach(btn => {
+    btn.addEventListener("click", () => refreshPrice(btn.dataset.refreshId));
+  });
 
   el.querySelectorAll("[data-price-id]").forEach(input => {
     input.addEventListener("change", () => updateCurrentPrice(input.dataset.priceId, input.value));
@@ -552,8 +594,7 @@ function initApp() {
   });
 
   document.getElementById("t-file").addEventListener("change", e => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     document.getElementById("upload-text").textContent = file.name;
     const reader = new FileReader();
     reader.onload = ev => {
