@@ -1,6 +1,6 @@
 /* ── 追加到 style.css 末尾 ────────────────────────────── */
 
-/* 上传区域 */
+/* 上传点击区域 */
 .upload-label {
   display: flex;
   align-items: center;
@@ -15,14 +15,8 @@
   transition: border-color 0.2s;
   margin-top: 4px;
 }
-.upload-label:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.upload-icon {
-  font-size: 18px;
-  flex-shrink: 0;
-}
+.upload-label:hover { border-color: var(--accent); color: var(--accent); }
+.upload-icon { font-size: 18px; flex-shrink: 0; }
 
 /* 转账卡片里的附件行 */
 .attachment-row {
@@ -33,23 +27,22 @@
   padding: 8px 10px;
   background: var(--card2, #1a1a1a);
   border-radius: 8px;
+  flex-wrap: wrap;
 }
-.attachment-icon {
-  font-size: 15px;
-  flex-shrink: 0;
-}
+.attachment-icon { font-size: 15px; flex-shrink: 0; }
+
+/* 缩略图（默认小图） */
 .attachment-thumb {
-  max-height: 80px;
-  max-width: 100%;
+  max-height: 72px;
+  max-width: 120px;
   border-radius: 6px;
-  object-fit: contain;
-  display: block;
+  object-fit: cover;
   cursor: pointer;
+  transition: max-height 0.3s ease, max-width 0.3s ease;
 }
-.attachment-link {
-  font-size: 13px;
-  color: var(--accent);
-  text-decoration: none;
-  word-break: break-all;
+/* 点击放大 */
+.attachment-thumb-full {
+  max-height: 400px;
+  max-width: 100%;
+  object-fit: contain;
 }
-.attachment-link:hover { text-decoration: underline; }

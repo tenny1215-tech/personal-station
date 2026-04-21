@@ -3,10 +3,8 @@ import {
   getFirestore, collection, addDoc, deleteDoc, doc,
   onSnapshot, orderBy, query, serverTimestamp, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-// ✅ 新增 Firebase Storage 引入
-import {
-  getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+// ✅ 不需要 Firebase Storage，图片直接压缩成 Base64 存 Firestore
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfx9IxuT4hW7h24wY6IZ0TGW1pxqe5N-M",
@@ -17,10 +15,8 @@ const firebaseConfig = {
   appId: "1:16967737691:web:53834006c3a385a7b63a7e"
 };
 
-// ✅ 保存 app 引用，Storage 需要用到
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
 // ── 密码锁 ────────────────────────────────────────────────
 const PASSWORD = "1215";
@@ -38,12 +34,12 @@ document.getElementById("lock-btn").addEventListener("click", () => {
     document.getElementById("lock-input").value = "";
   }
 });
-document.getElementById("lock-input").addEventListener("keydown", e => { if(e.key==="Enter") document.getElementById("lock-btn").click(); });
+document.getElementById("lock-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("lock-btn").click();
+});
 document.getElementById("logout-btn").addEventListener("click", () => {
   sessionStorage.removeItem("ivt_auth");
-  transfers = {};
-  holdings = {};
-  income = {};
+  transfers = {}; holdings = {}; income = {};
   window.location.replace(window.location.origin + window.location.pathname);
 });
 if (checkAuth()) unlock();
@@ -70,7 +66,7 @@ function closeModal(id) { document.getElementById("modal-"+id).classList.remove(
 function closeAll() { ["select","transfer","holding","income"].forEach(closeModal); }
 ["select","transfer","holding","income"].forEach(id => {
   const el = document.getElementById("modal-"+id);
-  el.addEventListener("click", e => { if(e.target===el) closeModal(id); });
+  el.addEventListener("click", e => { if (e.target === el) closeModal(id); });
 });
 
 // ── 状态 ──────────────────────────────────────────────────
@@ -78,87 +74,93 @@ let transfers={}, holdings={}, income={};
 
 function listenTransfers() {
   onSnapshot(query(collection(db,"transfers"), orderBy("date","desc")), snap => {
-    transfers={};
-    snap.forEach(d => { transfers[d.id]={id:d.id,...d.data()}; });
+    transfers = {};
+    snap.forEach(d => { transfers[d.id] = { id:d.id, ...d.data() }; });
     renderAll();
   });
 }
 function listenHoldings() {
   onSnapshot(query(collection(db,"holdings"), orderBy("date","desc")), snap => {
-    holdings={};
-    snap.forEach(d => { holdings[d.id]={id:d.id,...d.data()}; });
+    holdings = {};
+    snap.forEach(d => { holdings[d.id] = { id:d.id, ...d.data() }; });
     renderAll();
   });
 }
 function listenIncome() {
   onSnapshot(query(collection(db,"income"), orderBy("date","desc")), snap => {
-    income={};
-    snap.forEach(d => { income[d.id]={id:d.id,...d.data()}; });
+    income = {};
+    snap.forEach(d => { income[d.id] = { id:d.id, ...d.data() }; });
     renderAll();
   });
 }
 
-// ── ✅ Firebase Storage 上传 ───────────────────────────────
-function uploadFile(file, date) {
+// ── ✅ 图片压缩 → Base64（存入 Firestore） ─────────────────
+// 压缩到最长边 1200px，JPEG 质量 0.72，一般截图压缩后 150~400KB
+function compressImage(file) {
   return new Promise((resolve, reject) => {
-    const ext = file.name.split('.').pop();
-    const path = `transfers/${date}-${Date.now()}.${ext}`;
-    const fileRef = storageRef(storage, path);
-    const task = uploadBytesResumable(fileRef, file);
-
-    const progressWrap = document.getElementById("upload-progress-wrap");
-    const progressBar = document.getElementById("upload-progress-bar");
-    progressWrap.style.display = "block";
-
-    task.on("state_changed",
-      snapshot => {
-        const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-        progressBar.style.width = pct + "%";
-      },
-      err => {
-        progressWrap.style.display = "none";
-        reject(err);
-      },
-      async () => {
-        progressWrap.style.display = "none";
-        const url = await getDownloadURL(task.snapshot.ref);
-        resolve({ url, path });
-      }
-    );
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("只支持图片格式（jpg/png/webp）"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("读取文件失败"));
+    reader.onload = e => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("图片解析失败"));
+      img.onload = () => {
+        const MAX = 1200;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const base64 = canvas.toDataURL("image/jpeg", 0.72);
+        // 粗略估算大小：base64 长度 * 0.75 = 字节数
+        const sizeKB = Math.round(base64.length * 0.75 / 1024);
+        if (sizeKB > 900) {
+          reject(new Error(`图片压缩后仍有 ${sizeKB}KB，超过 Firestore 限制，请换一张截图`));
+          return;
+        }
+        resolve(base64);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
   });
 }
 
 // ── 转账表单 ──────────────────────────────────────────────
 function resetTransferForm() {
   document.getElementById("t-edit-id").value = "";
-  ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-hsbc-remaining","t-ibkr","t-ibkr-fee","t-note"].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value="";
+  ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-hsbc-remaining",
+   "t-ibkr","t-ibkr-fee","t-note"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = "";
   });
   document.getElementById("t-date").value = today();
   document.getElementById("t-preview").style.display = "none";
   document.getElementById("calc-rate").textContent = "填写以上两栏自动计算汇率";
   document.getElementById("calc-rate").classList.remove("active");
-
-  // ✅ 清空文件上传区域
+  // 清空上传区
   document.getElementById("t-file").value = "";
-  document.getElementById("upload-text").textContent = "点击选择图片或 PDF";
+  document.getElementById("upload-text").textContent = "点击选择图片（自动压缩后保存）";
   document.getElementById("upload-preview").innerHTML = "";
   document.getElementById("existing-attachment").style.display = "none";
   document.getElementById("existing-attachment").innerHTML = "";
-  document.getElementById("upload-progress-wrap").style.display = "none";
-  document.getElementById("upload-progress-bar").style.width = "0%";
 }
 
 function calcPreview() {
-  const usdBought      = parseFloat(document.getElementById("t-usd-bought").value)||0;
-  const cnySpent       = parseFloat(document.getElementById("t-cny-spent").value)||0;
-  const usdSent        = parseFloat(document.getElementById("t-usd-sent").value)||0;
-  const wireFee        = parseFloat(document.getElementById("t-wire-fee").value)||0;
-  const hsbcRemaining  = parseFloat(document.getElementById("t-hsbc-remaining").value)||0;
-  const ibkr           = parseFloat(document.getElementById("t-ibkr").value)||0;
-  const ibkrFee        = parseFloat(document.getElementById("t-ibkr-fee").value)||0;
+  const usdBought     = parseFloat(document.getElementById("t-usd-bought").value)||0;
+  const cnySpent      = parseFloat(document.getElementById("t-cny-spent").value)||0;
+  const usdSent       = parseFloat(document.getElementById("t-usd-sent").value)||0;
+  const wireFee       = parseFloat(document.getElementById("t-wire-fee").value)||0;
+  const hsbcRemaining = parseFloat(document.getElementById("t-hsbc-remaining").value)||0;
+  const ibkr          = parseFloat(document.getElementById("t-ibkr").value)||0;
+  const ibkrFee       = parseFloat(document.getElementById("t-ibkr-fee").value)||0;
 
-  // 计算汇率
   const rateEl = document.getElementById("calc-rate");
   if (usdBought > 0 && cnySpent > 0) {
     const rate = cnySpent / usdBought;
@@ -170,13 +172,14 @@ function calcPreview() {
   }
 
   const preview = document.getElementById("t-preview");
-  if (!usdBought || !cnySpent) { preview.style.display="none"; return; }
+  if (!usdBought || !cnySpent) { preview.style.display = "none"; return; }
 
-  const rate = cnySpent / usdBought;
-  const totalCNY = cnySpent + wireFee;
+  const rate         = cnySpent / usdBought;
+  const totalCNY     = cnySpent + wireFee;
   const totalUSDCost = totalCNY / rate;
-  const ibkrArrived = ibkr || usdSent || usdBought;
-  const loss = usdBought - ibkrArrived - hsbcRemaining;
+  const ibkrArrived  = ibkr || usdSent || usdBought;
+  // 损耗 = 买了多少 - IBKR到账 - 汇丰留存 - 电汇费
+  const loss = usdBought - ibkrArrived - hsbcRemaining - ibkrFee;
 
   document.getElementById("t-preview-content").innerHTML =
     `<div><div class="p-label">实际汇率</div><div class="p-value" style="color:var(--accent)">${rate.toFixed(4)}</div></div>`+
@@ -184,7 +187,8 @@ function calcPreview() {
     `<div><div class="p-label">等值美金成本</div><div class="p-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</div></div>`+
     `<div><div class="p-label">IBKR 实际到账</div><div class="p-value" style="color:var(--green)">$${f2(ibkr||0)}</div></div>`+
     (hsbcRemaining > 0 ? `<div><div class="p-label">汇丰留存</div><div class="p-value" style="color:var(--accent)">$${f2(hsbcRemaining)}</div></div>` : "")+
-    (loss > 0.005 ? `<div style="grid-column:span 2"><div class="p-label">中途损耗（手续费等）</div><div class="p-value" style="color:var(--red)">-$${f2(loss)}</div></div>` : "");
+    (ibkrFee > 0 ? `<div><div class="p-label">电汇手续费</div><div class="p-value" style="color:var(--red)">-$${f2(ibkrFee)}</div></div>` : "")+
+    (loss > 0.01 ? `<div style="grid-column:span 2"><div class="p-label">其他损耗</div><div class="p-value" style="color:var(--red)">-$${f2(loss)}</div></div>` : "");
   preview.style.display = "block";
 }
 
@@ -201,39 +205,31 @@ async function saveTransfer() {
   const note          = document.getElementById("t-note").value;
   const fileInput     = document.getElementById("t-file");
 
-  if (!usdBought||!cnySpent) { alert("请填写购买美金和花费人民币"); return; }
-  if (!ibkr) { alert("请填写IBKR到账金额"); return; }
+  if (!usdBought || !cnySpent) { alert("请填写购买美金和花费人民币"); return; }
+  if (!ibkr) { alert("请填写 IBKR 到账金额"); return; }
 
   const rate         = +(cnySpent / usdBought).toFixed(4);
   const totalCNY     = +(cnySpent + wireFee).toFixed(2);
   const totalUSDCost = +(totalCNY / rate).toFixed(2);
 
-  // ✅ 禁用按钮，防止重复提交
   const saveBtn = document.getElementById("btn-transfer-save");
   saveBtn.disabled = true;
   saveBtn.textContent = "保存中…";
 
   try {
-    let attachmentUrl  = editId ? (transfers[editId]?.attachmentUrl  || null) : null;
-    let attachmentPath = editId ? (transfers[editId]?.attachmentPath || null) : null;
-    let attachmentName = editId ? (transfers[editId]?.attachmentName || null) : null;
+    // ✅ Base64：如有新图片则压缩，否则保留旧值
+    let attachmentBase64 = editId ? (transfers[editId]?.attachmentBase64 || null) : null;
 
-    // ✅ 如果有新文件，上传
     if (fileInput.files && fileInput.files[0]) {
-      const file = fileInput.files[0];
-      const result = await uploadFile(file, date);
-      attachmentUrl  = result.url;
-      attachmentPath = result.path;
-      attachmentName = file.name;
+      saveBtn.textContent = "压缩图片中…";
+      attachmentBase64 = await compressImage(fileInput.files[0]);
     }
 
     const payload = {
       usdBought, cnySpent, usdSent, wireFee, hsbcRemaining,
       ibkr, ibkrFee, rate, totalCNY, totalUSDCost,
       date, note,
-      attachmentUrl,
-      attachmentPath,
-      attachmentName
+      attachmentBase64   // ✅ 直接存图片 base64 字符串
     };
 
     if (editId) {
@@ -254,76 +250,82 @@ async function saveTransfer() {
 
 // ── 持仓 ──────────────────────────────────────────────────
 function resetHoldingForm() {
-  document.getElementById("h-edit-id").value="";
-  ["h-ticker","h-name","h-price","h-shares","h-commission","h-current"].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.value="";
+  document.getElementById("h-edit-id").value = "";
+  ["h-ticker","h-name","h-price","h-shares","h-commission","h-current"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = "";
   });
-  document.getElementById("h-date").value=today();
-  document.getElementById("h-type").value="stock";
-  document.getElementById("holding-modal-title").textContent="买入股票";
+  document.getElementById("h-date").value = today();
+  document.getElementById("h-type").value = "stock";
+  document.getElementById("holding-modal-title").textContent = "买入股票";
 }
 async function saveHolding() {
-  const editId=document.getElementById("h-edit-id").value;
-  const ticker=(document.getElementById("h-ticker").value||"").toUpperCase().trim();
-  const name=document.getElementById("h-name").value.trim();
-  const price=parseFloat(document.getElementById("h-price").value)||0;
-  const shares=parseFloat(document.getElementById("h-shares").value)||0;
-  const commission=parseFloat(document.getElementById("h-commission").value)||0;
-  const current=parseFloat(document.getElementById("h-current").value)||0;
-  const date=document.getElementById("h-date").value;
-  const type=document.getElementById("h-type").value;
-  if(!ticker||!price||!shares){alert("请填写代码、买入价和股数");return;}
-  if(editId) await updateDoc(doc(db,"holdings",editId),{ticker,name,price,shares,commission,current,date,type});
-  else await addDoc(collection(db,"holdings"),{ticker,name,price,shares,commission,current,date,type,createdAt:serverTimestamp()});
+  const editId     = document.getElementById("h-edit-id").value;
+  const ticker     = (document.getElementById("h-ticker").value||"").toUpperCase().trim();
+  const name       = document.getElementById("h-name").value.trim();
+  const price      = parseFloat(document.getElementById("h-price").value)||0;
+  const shares     = parseFloat(document.getElementById("h-shares").value)||0;
+  const commission = parseFloat(document.getElementById("h-commission").value)||0;
+  const current    = parseFloat(document.getElementById("h-current").value)||0;
+  const date       = document.getElementById("h-date").value;
+  const type       = document.getElementById("h-type").value;
+  if (!ticker||!price||!shares) { alert("请填写代码、买入价和股数"); return; }
+  if (editId) await updateDoc(doc(db,"holdings",editId), {ticker,name,price,shares,commission,current,date,type});
+  else await addDoc(collection(db,"holdings"), {ticker,name,price,shares,commission,current,date,type,createdAt:serverTimestamp()});
   closeModal("holding");
 }
-async function updateCurrentPrice(id,val) { await updateDoc(doc(db,"holdings",id),{current:parseFloat(val)||0}); }
-async function deleteHolding(id) { if(!confirm("删除这条持仓？"))return; await deleteDoc(doc(db,"holdings",id)); }
+async function updateCurrentPrice(id, val) {
+  await updateDoc(doc(db,"holdings",id), { current: parseFloat(val)||0 });
+}
+async function deleteHolding(id) {
+  if (!confirm("删除这条持仓？")) return;
+  await deleteDoc(doc(db,"holdings",id));
+}
 async function deleteTransfer(id) {
-  if(!confirm("删除这条转账记录？"))return;
-  // ✅ 如果有附件，同步删除 Storage 文件
-  const t = transfers[id];
-  if (t?.attachmentPath) {
-    try { await deleteObject(storageRef(storage, t.attachmentPath)); } catch(e) { /* 忽略已删除文件 */ }
-  }
+  if (!confirm("删除这条转账记录？")) return;
+  // ✅ Base64 方案：删 Firestore 文档就够了，无需删 Storage
   await deleteDoc(doc(db,"transfers",id));
 }
 
 // ── 收入 ──────────────────────────────────────────────────
 function resetIncomeForm() {
-  ["i-ticker","i-amount","i-note"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
-  document.getElementById("i-date").value=today();
-  document.getElementById("i-type").value="interest";
+  ["i-ticker","i-amount","i-note"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = "";
+  });
+  document.getElementById("i-date").value = today();
+  document.getElementById("i-type").value = "interest";
 }
 async function saveIncome() {
-  const type=document.getElementById("i-type").value;
-  const ticker=(document.getElementById("i-ticker").value||"").toUpperCase().trim();
-  const amount=parseFloat(document.getElementById("i-amount").value)||0;
-  const date=document.getElementById("i-date").value;
-  const note=document.getElementById("i-note").value;
-  if(!amount){alert("请填写金额");return;}
-  await addDoc(collection(db,"income"),{type,ticker,amount,date,note,createdAt:serverTimestamp()});
+  const type   = document.getElementById("i-type").value;
+  const ticker = (document.getElementById("i-ticker").value||"").toUpperCase().trim();
+  const amount = parseFloat(document.getElementById("i-amount").value)||0;
+  const date   = document.getElementById("i-date").value;
+  const note   = document.getElementById("i-note").value;
+  if (!amount) { alert("请填写金额"); return; }
+  await addDoc(collection(db,"income"), {type,ticker,amount,date,note,createdAt:serverTimestamp()});
   closeModal("income");
 }
-async function deleteIncome(id) { if(!confirm("删除？"))return; await deleteDoc(doc(db,"income",id)); }
+async function deleteIncome(id) {
+  if (!confirm("删除？")) return;
+  await deleteDoc(doc(db,"income",id));
+}
 
 // ── 渲染 ──────────────────────────────────────────────────
 function renderAll() { renderOverview(); renderTransfers(); renderHoldings(); renderIncome(); }
 
 function renderOverview() {
-  const tArr=Object.values(transfers);
-  const hArr=Object.values(holdings);
-  const iArr=Object.values(income);
-  const totalIBKR=tArr.reduce((s,t)=>s+t.ibkr,0);
-  const totalCNY=tArr.reduce((s,t)=>s+t.totalCNY,0);
-  const totalUSDCost=tArr.reduce((s,t)=>s+t.totalUSDCost,0);
-  const totalIncome=iArr.reduce((s,i)=>s+i.amount,0);
-  const totalCost=hArr.reduce((s,h)=>s+(h.price*h.shares+(h.commission||0)),0);
-  const totalMkt=hArr.reduce((s,h)=>s+((h.current||h.price)*h.shares),0);
-  const totalPnL=totalMkt-totalCost;
-  const totalReturn=totalUSDCost>0?((totalPnL+totalIncome)/totalUSDCost*100):0;
+  const tArr = Object.values(transfers);
+  const hArr = Object.values(holdings);
+  const iArr = Object.values(income);
+  const totalIBKR    = tArr.reduce((s,t) => s+t.ibkr, 0);
+  const totalCNY     = tArr.reduce((s,t) => s+t.totalCNY, 0);
+  const totalUSDCost = tArr.reduce((s,t) => s+t.totalUSDCost, 0);
+  const totalIncome  = iArr.reduce((s,i) => s+i.amount, 0);
+  const totalCost    = hArr.reduce((s,h) => s+(h.price*h.shares+(h.commission||0)), 0);
+  const totalMkt     = hArr.reduce((s,h) => s+((h.current||h.price)*h.shares), 0);
+  const totalPnL     = totalMkt - totalCost;
+  const totalReturn  = totalUSDCost > 0 ? ((totalPnL+totalIncome)/totalUSDCost*100) : 0;
 
-  document.getElementById("overview-grid").innerHTML=
+  document.getElementById("overview-grid").innerHTML =
     `<div class="summary-card"><div class="summary-label">IBKR 到账</div><div class="summary-value accent">$${f0(totalIBKR)}</div></div>`+
     `<div class="summary-card"><div class="summary-label">总人民币支出</div><div class="summary-value">¥${f0(totalCNY)}</div></div>`+
     `<div class="summary-card"><div class="summary-label">持仓盈亏</div><div class="summary-value" style="color:${pnlColor(totalPnL)}">${sign(totalPnL)}$${f2(totalPnL)}</div></div>`+
@@ -331,31 +333,36 @@ function renderOverview() {
     `<div class="summary-card"><div class="summary-label">等值美金成本</div><div class="summary-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</div></div>`+
     `<div class="summary-card"><div class="summary-label">真实回报率</div><div class="summary-value" style="color:${pnlColor(totalReturn)}">${sign(totalReturn)}${f2(totalReturn)}%</div></div>`;
 
-  document.getElementById("flow-summary").innerHTML=tArr.length===0
-    ?`<div style="color:var(--muted);font-size:14px;">还没有记录，点右下角 ＋ 开始</div>`
-    :`<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">共 ${tArr.length} 笔转账</div>`+
-     `<div style="font-size:15px;font-weight:600;line-height:2">` +
-     `¥${f0(totalCNY)} → <span style="color:var(--accent)">$${f2(totalIBKR)}</span> 到账<br>`+
-     `<span style="font-size:13px;color:var(--yellow)">等值美金总成本 $${f2(totalUSDCost)}（含所有手续费）</span></div>`;
+  document.getElementById("flow-summary").innerHTML = tArr.length === 0
+    ? `<div style="color:var(--muted);font-size:14px;">还没有记录，点右下角 ＋ 开始</div>`
+    : `<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">共 ${tArr.length} 笔转账</div>`+
+      `<div style="font-size:15px;font-weight:600;line-height:2">`+
+      `¥${f0(totalCNY)} → <span style="color:var(--accent)">$${f2(totalIBKR)}</span> 到账<br>`+
+      `<span style="font-size:13px;color:var(--yellow)">等值美金总成本 $${f2(totalUSDCost)}（含所有手续费）</span></div>`;
 
-  document.getElementById("overview-holdings").innerHTML=hArr.length===0
-    ?`<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">还没有持仓</div></div>`
-    :hArr.map(h=>{
-      const cost=h.price*h.shares+(h.commission||0);
-      const mkt=(h.current||h.price)*h.shares;
-      const pnl=mkt-cost;
-      const pct=cost>0?(pnl/cost*100):0;
-      const tag=h.type==="bond-etf"?`<span class="tag tag-yellow">债券ETF</span>`:h.type==="etf"?`<span class="tag tag-blue">ETF</span>`:`<span class="tag tag-blue">股票</span>`;
-      return `<div class="holding-card"><div class="holding-header"><div><div class="holding-ticker">${h.ticker} ${tag}</div><div class="holding-sub">${h.name||""} · ${h.shares}股</div></div><div class="holding-pnl"><div class="amount" style="color:${pnlColor(pnl)}">${sign(pnl)}$${f2(pnl)}</div><div class="pct">${sign(pct)}${f2(pct)}%</div></div></div></div>`;
-    }).join("");
+  document.getElementById("overview-holdings").innerHTML = hArr.length === 0
+    ? `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">还没有持仓</div></div>`
+    : hArr.map(h => {
+        const cost = h.price*h.shares+(h.commission||0);
+        const mkt  = (h.current||h.price)*h.shares;
+        const pnl  = mkt - cost;
+        const pct  = cost > 0 ? (pnl/cost*100) : 0;
+        const tag  = h.type==="bond-etf" ? `<span class="tag tag-yellow">债券ETF</span>`
+                   : h.type==="etf"      ? `<span class="tag tag-blue">ETF</span>`
+                   :                       `<span class="tag tag-blue">股票</span>`;
+        return `<div class="holding-card"><div class="holding-header"><div><div class="holding-ticker">${h.ticker} ${tag}</div><div class="holding-sub">${h.name||""} · ${h.shares}股</div></div><div class="holding-pnl"><div class="amount" style="color:${pnlColor(pnl)}">${sign(pnl)}$${f2(pnl)}</div><div class="pct">${sign(pct)}${f2(pct)}%</div></div></div></div>`;
+      }).join("");
 }
 
 function renderTransfers() {
-  const el=document.getElementById("transfer-list");
-  const arr=Object.values(transfers);
-  if(arr.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">💸</div><div class="empty-text">还没有转账记录<br>点右下角 ＋ 添加</div></div>`;return;}
-  
-  el.innerHTML=arr.map(t=>`<div class="transfer-card">
+  const el  = document.getElementById("transfer-list");
+  const arr = Object.values(transfers);
+  if (arr.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">💸</div><div class="empty-text">还没有转账记录<br>点右下角 ＋ 添加</div></div>`;
+    return;
+  }
+
+  el.innerHTML = arr.map(t => `<div class="transfer-card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
       <div>
         <div style="font-size:15px;font-weight:700;color:var(--accent)">$${f2(t.ibkr)} 到账 IBKR</div>
@@ -371,56 +378,55 @@ function renderTransfers() {
       <div><div class="tm-label">购买美金</div><div class="tm-value">$${f2(t.usdBought)}</div></div>
       <div><div class="tm-label">花费人民币</div><div class="tm-value">¥${f0(t.cnySpent)}</div></div>
       <div><div class="tm-label">实际汇率</div><div class="tm-value" style="color:var(--accent)">${t.rate}</div></div>
-      <div><div class="tm-label">汇款手续费</div><div class="tm-value" style="color:var(--red)">¥${f2(t.wireFee||0)}</div></div>
+      <div><div class="tm-label">邮电+手续费</div><div class="tm-value" style="color:var(--red)">¥${f2(t.wireFee||0)}</div></div>
     </div>
     <div class="step-mini">② 汇出 → ③ 到账</div>
     <div class="tm-grid">
       <div><div class="tm-label">汇出美金</div><div class="tm-value">$${f2(t.usdSent||0)}</div></div>
-      <div><div class="tm-label">IBKR手续费</div><div class="tm-value" style="color:var(--red)">$${f2(t.ibkrFee||0)}</div></div>
+      <!-- ✅ 改名：电汇手续费 -->
+      <div><div class="tm-label">电汇手续费</div><div class="tm-value" style="color:var(--red)">$${f2(t.ibkrFee||0)}</div></div>
       ${(t.hsbcRemaining > 0) ? `<div><div class="tm-label">汇丰留存</div><div class="tm-value" style="color:var(--accent)">$${f2(t.hsbcRemaining)}</div></div>` : ""}
     </div>
     <div style="background:var(--card2);border-radius:10px;padding:10px 12px;margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div><div class="tm-label">总人民币支出</div><div class="tm-value" style="color:var(--red)">¥${f0(t.totalCNY)}</div></div>
       <div><div class="tm-label">等值美金成本</div><div class="tm-value" style="color:var(--yellow)">$${f2(t.totalUSDCost)}</div></div>
     </div>
-    ${t.attachmentUrl ? `
+    <!-- ✅ 附件：Base64 图片直接内嵌显示 -->
+    ${t.attachmentBase64 ? `
     <div class="attachment-row">
       <span class="attachment-icon">📎</span>
-      ${t.attachmentName && t.attachmentName.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-        ? `<a href="${t.attachmentUrl}" target="_blank" rel="noopener">
-             <img src="${t.attachmentUrl}" class="attachment-thumb" alt="凭证">
-           </a>`
-        : `<a href="${t.attachmentUrl}" target="_blank" rel="noopener" class="attachment-link">${t.attachmentName||"查看附件"}</a>`
-      }
+      <img src="${t.attachmentBase64}" class="attachment-thumb" alt="转账凭证"
+           onclick="this.classList.toggle('attachment-thumb-full')">
+      <span style="font-size:11px;color:var(--muted)">点击图片放大</span>
     </div>` : ""}
   </div>`).join("");
 
-  el.querySelectorAll("[data-del-transfer]").forEach(btn=>{
-    btn.addEventListener("click",()=>deleteTransfer(btn.dataset.delTransfer));
+  el.querySelectorAll("[data-del-transfer]").forEach(btn => {
+    btn.addEventListener("click", () => deleteTransfer(btn.dataset.delTransfer));
   });
 
-  el.querySelectorAll("[data-edit-transfer]").forEach(btn=>{
-    btn.addEventListener("click",()=>{
+  el.querySelectorAll("[data-edit-transfer]").forEach(btn => {
+    btn.addEventListener("click", () => {
       const t = transfers[btn.dataset.editTransfer];
-      if(!t) return;
-      document.getElementById("t-edit-id").value       = t.id;
-      document.getElementById("t-usd-bought").value    = t.usdBought;
-      document.getElementById("t-cny-spent").value     = t.cnySpent;
-      document.getElementById("t-usd-sent").value      = t.usdSent || "";
-      document.getElementById("t-wire-fee").value      = t.wireFee || "";
-      document.getElementById("t-hsbc-remaining").value= t.hsbcRemaining || "";
-      document.getElementById("t-ibkr").value          = t.ibkr;
-      document.getElementById("t-ibkr-fee").value      = t.ibkrFee || "";
-      document.getElementById("t-date").value          = t.date;
-      document.getElementById("t-note").value          = t.note || "";
+      if (!t) return;
+      document.getElementById("t-edit-id").value        = t.id;
+      document.getElementById("t-usd-bought").value     = t.usdBought;
+      document.getElementById("t-cny-spent").value      = t.cnySpent;
+      document.getElementById("t-usd-sent").value       = t.usdSent || "";
+      document.getElementById("t-wire-fee").value       = t.wireFee || "";
+      document.getElementById("t-hsbc-remaining").value = t.hsbcRemaining || "";
+      document.getElementById("t-ibkr").value           = t.ibkr;
+      document.getElementById("t-ibkr-fee").value       = t.ibkrFee || "";
+      document.getElementById("t-date").value           = t.date;
+      document.getElementById("t-note").value           = t.note || "";
 
-      // ✅ 显示已有附件提示
+      // ✅ 显示已有截图缩略图
       const existingEl = document.getElementById("existing-attachment");
-      if (t.attachmentUrl) {
+      if (t.attachmentBase64) {
         existingEl.style.display = "block";
-        existingEl.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-top:6px">
-          已有附件：<a href="${t.attachmentUrl}" target="_blank" rel="noopener" style="color:var(--accent)">${t.attachmentName||"查看附件"}</a>
-          <span style="color:var(--muted)">（重新选择文件将替换旧附件）</span>
+        existingEl.innerHTML = `<div style="margin-top:8px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">已有截图（重新选择图片将替换）：</div>
+          <img src="${t.attachmentBase64}" style="max-height:80px;border-radius:6px;object-fit:contain;">
         </div>`;
       } else {
         existingEl.style.display = "none";
@@ -433,16 +439,19 @@ function renderTransfers() {
 }
 
 function renderHoldings() {
-  const el=document.getElementById("holdings-list");
-  const arr=Object.values(holdings);
-  if(arr.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">📈</div><div class="empty-text">还没有持仓记录<br>点右下角 ＋ 添加</div></div>`;return;}
-  el.innerHTML=arr.map(h=>{
-    const cost=h.price*h.shares+(h.commission||0);
-    const mkt=(h.current||h.price)*h.shares;
-    const pnl=mkt-cost;
-    const pct=cost>0?(pnl/cost*100):0;
-    const typeLabel=h.type==="bond-etf"?"债券ETF":h.type==="etf"?"ETF":"股票";
-    const tagCls=h.type==="bond-etf"?"tag-yellow":"tag-blue";
+  const el  = document.getElementById("holdings-list");
+  const arr = Object.values(holdings);
+  if (arr.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📈</div><div class="empty-text">还没有持仓记录<br>点右下角 ＋ 添加</div></div>`;
+    return;
+  }
+  el.innerHTML = arr.map(h => {
+    const cost     = h.price*h.shares+(h.commission||0);
+    const mkt      = (h.current||h.price)*h.shares;
+    const pnl      = mkt - cost;
+    const pct      = cost > 0 ? (pnl/cost*100) : 0;
+    const typeLabel = h.type==="bond-etf" ? "债券ETF" : h.type==="etf" ? "ETF" : "股票";
+    const tagCls    = h.type==="bond-etf" ? "tag-yellow" : "tag-blue";
     return `<div class="holding-card">
       <div class="holding-header">
         <div><div class="holding-ticker">${h.ticker} <span class="tag ${tagCls}">${typeLabel}</span></div><div class="holding-sub">${h.name||""} · ${h.date}</div></div>
@@ -463,91 +472,92 @@ function renderHoldings() {
       </div>
     </div>`;
   }).join("");
-  el.querySelectorAll("[data-price-id]").forEach(input=>{
-    input.addEventListener("change",()=>updateCurrentPrice(input.dataset.priceId,input.value));
+
+  el.querySelectorAll("[data-price-id]").forEach(input => {
+    input.addEventListener("change", () => updateCurrentPrice(input.dataset.priceId, input.value));
   });
-  el.querySelectorAll("[data-edit-id]").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      const h=holdings[btn.dataset.editId]; if(!h)return;
-      document.getElementById("h-edit-id").value=h.id;
-      document.getElementById("h-ticker").value=h.ticker;
-      document.getElementById("h-name").value=h.name||"";
-      document.getElementById("h-price").value=h.price;
-      document.getElementById("h-shares").value=h.shares;
-      document.getElementById("h-commission").value=h.commission||"";
-      document.getElementById("h-current").value=h.current||"";
-      document.getElementById("h-date").value=h.date;
-      document.getElementById("h-type").value=h.type||"stock";
-      document.getElementById("holding-modal-title").textContent="编辑持仓";
+  el.querySelectorAll("[data-edit-id]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const h = holdings[btn.dataset.editId]; if (!h) return;
+      document.getElementById("h-edit-id").value     = h.id;
+      document.getElementById("h-ticker").value      = h.ticker;
+      document.getElementById("h-name").value        = h.name||"";
+      document.getElementById("h-price").value       = h.price;
+      document.getElementById("h-shares").value      = h.shares;
+      document.getElementById("h-commission").value  = h.commission||"";
+      document.getElementById("h-current").value     = h.current||"";
+      document.getElementById("h-date").value        = h.date;
+      document.getElementById("h-type").value        = h.type||"stock";
+      document.getElementById("holding-modal-title").textContent = "编辑持仓";
       openModal("holding");
     });
   });
-  el.querySelectorAll("[data-del-holding]").forEach(btn=>{
-    btn.addEventListener("click",()=>deleteHolding(btn.dataset.delHolding));
+  el.querySelectorAll("[data-del-holding]").forEach(btn => {
+    btn.addEventListener("click", () => deleteHolding(btn.dataset.delHolding));
   });
 }
 
 function renderIncome() {
-  const el=document.getElementById("income-list");
-  const arr=Object.values(income);
-  const total=arr.reduce((s,i)=>s+i.amount,0);
-  if(arr.length===0){el.innerHTML=`<div class="empty"><div class="empty-icon">💰</div><div class="empty-text">还没有收入记录<br>点右下角 ＋ 添加</div></div>`;return;}
-  const typeLabel={interest:"利息",dividend:"股息",other:"其他"};
-  const tagCls={interest:"tag-green",dividend:"tag-blue",other:"tag-yellow"};
-  el.innerHTML=
+  const el    = document.getElementById("income-list");
+  const arr   = Object.values(income);
+  const total = arr.reduce((s,i) => s+i.amount, 0);
+  if (arr.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">💰</div><div class="empty-text">还没有收入记录<br>点右下角 ＋ 添加</div></div>`;
+    return;
+  }
+  const typeLabel = { interest:"利息", dividend:"股息", other:"其他" };
+  const tagCls    = { interest:"tag-green", dividend:"tag-blue", other:"tag-yellow" };
+  el.innerHTML =
     `<div class="card" style="margin-bottom:16px;"><div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--muted)">总收入</span><span style="font-size:20px;font-weight:700;color:var(--green)">+$${f2(total)}</span></div></div>`+
-    arr.map(i=>`<div class="income-card">
+    arr.map(i => `<div class="income-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-weight:700">${i.ticker||"—"}</span><span class="tag ${tagCls[i.type]}">${typeLabel[i.type]}</span></div>
         <div style="font-size:12px;color:var(--muted)">${i.date}${i.note?" · "+i.note:""}</div></div>
         <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px;font-weight:700;color:var(--green)">+$${f2(i.amount)}</span><button class="btn-sm-danger" data-del-income="${i.id}">删除</button></div>
       </div>
     </div>`).join("");
-  el.querySelectorAll("[data-del-income]").forEach(btn=>{
-    btn.addEventListener("click",()=>deleteIncome(btn.dataset.delIncome));
+  el.querySelectorAll("[data-del-income]").forEach(btn => {
+    btn.addEventListener("click", () => deleteIncome(btn.dataset.delIncome));
   });
 }
 
 // ── 初始化 ────────────────────────────────────────────────
 function initApp() {
-  document.getElementById("nav-overview").addEventListener("click",()=>showPage("overview"));
-  document.getElementById("nav-transfers").addEventListener("click",()=>showPage("transfers"));
-  document.getElementById("nav-holdings").addEventListener("click",()=>showPage("holdings"));
-  document.getElementById("nav-income").addEventListener("click",()=>showPage("income"));
-  document.getElementById("fab").addEventListener("click",()=>openModal("select"));
+  document.getElementById("nav-overview").addEventListener("click",  () => showPage("overview"));
+  document.getElementById("nav-transfers").addEventListener("click", () => showPage("transfers"));
+  document.getElementById("nav-holdings").addEventListener("click",  () => showPage("holdings"));
+  document.getElementById("nav-income").addEventListener("click",    () => showPage("income"));
+  document.getElementById("fab").addEventListener("click", () => openModal("select"));
 
-  document.getElementById("btn-add-transfer").addEventListener("click",()=>{closeAll();resetTransferForm();openModal("transfer");});
-  document.getElementById("btn-add-holding").addEventListener("click",()=>{closeAll();resetHoldingForm();openModal("holding");});
-  document.getElementById("btn-add-income").addEventListener("click",()=>{closeAll();resetIncomeForm();openModal("income");});
-  document.getElementById("btn-cancel-select").addEventListener("click",()=>closeModal("select"));
+  document.getElementById("btn-add-transfer").addEventListener("click", () => { closeAll(); resetTransferForm(); openModal("transfer"); });
+  document.getElementById("btn-add-holding").addEventListener("click",  () => { closeAll(); resetHoldingForm();  openModal("holding"); });
+  document.getElementById("btn-add-income").addEventListener("click",   () => { closeAll(); resetIncomeForm();   openModal("income"); });
+  document.getElementById("btn-cancel-select").addEventListener("click", () => closeModal("select"));
 
-  document.getElementById("btn-transfer-cancel").addEventListener("click",()=>closeModal("transfer"));
-  document.getElementById("btn-transfer-save").addEventListener("click",saveTransfer);
-  ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-hsbc-remaining","t-ibkr","t-ibkr-fee"].forEach(id=>{
-    document.getElementById(id).addEventListener("input",calcPreview);
+  document.getElementById("btn-transfer-cancel").addEventListener("click", () => closeModal("transfer"));
+  document.getElementById("btn-transfer-save").addEventListener("click", saveTransfer);
+
+  ["t-usd-bought","t-cny-spent","t-usd-sent","t-wire-fee","t-hsbc-remaining","t-ibkr","t-ibkr-fee"].forEach(id => {
+    document.getElementById(id).addEventListener("input", calcPreview);
   });
 
-  // ✅ 文件选择预览
+  // ✅ 选图片后立即本地预览
   document.getElementById("t-file").addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
     document.getElementById("upload-text").textContent = file.name;
-    const preview = document.getElementById("upload-preview");
-    if (file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        preview.innerHTML = `<img src="${ev.target.result}" style="max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;object-fit:contain;">`;
-      };
-      reader.readAsDataURL(file);
-    } else {
-      preview.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-top:6px">📄 ${file.name}</div>`;
-    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById("upload-preview").innerHTML =
+        `<img src="${ev.target.result}" style="max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;object-fit:contain;">`;
+    };
+    reader.readAsDataURL(file);
   });
 
-  document.getElementById("btn-holding-cancel").addEventListener("click",()=>closeModal("holding"));
-  document.getElementById("btn-holding-save").addEventListener("click",saveHolding);
-  document.getElementById("btn-income-cancel").addEventListener("click",()=>closeModal("income"));
-  document.getElementById("btn-income-save").addEventListener("click",saveIncome);
+  document.getElementById("btn-holding-cancel").addEventListener("click", () => closeModal("holding"));
+  document.getElementById("btn-holding-save").addEventListener("click", saveHolding);
+  document.getElementById("btn-income-cancel").addEventListener("click", () => closeModal("income"));
+  document.getElementById("btn-income-save").addEventListener("click", saveIncome);
 
   listenTransfers();
   listenHoldings();
