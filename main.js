@@ -70,6 +70,65 @@ function closeAll() { ["select","transfer","holding","income"].forEach(closeModa
 // ── 状态 ──────────────────────────────────────────────────
 let transfers={}, holdings={}, income={}, cashBalance=0, eurRate=null;
 
+// ── 市场情绪指标 ──────────────────────────────────────────
+async function fetchSentiment() {
+  try {
+    const r = await fetch("/api/sentiment");
+    const d = await r.json();
+
+    // VIX
+    if (d.vix) {
+      const v = d.vix.value;
+      const color = v < 15 ? "var(--green)" : v < 25 ? "var(--yellow)" : "var(--red)";
+      const label = v < 15 ? "低波动" : v < 25 ? "警惕" : "恐慌";
+      setSentCard("sent-vix", v.toFixed(1), label, color);
+    } else {
+      setSentCard("sent-vix", "N/A", "暂无数据", "var(--muted)");
+    }
+
+    // Fear & Greed
+    if (d.fearGreed) {
+      const v = d.fearGreed.value;
+      const color = v < 25 ? "var(--red)" : v < 45 ? "var(--yellow)" : v < 55 ? "var(--muted)" : v < 75 ? "var(--green)" : "#10b981";
+      setSentCard("sent-fg", v, d.fearGreed.label, color);
+    } else {
+      setSentCard("sent-fg", "N/A", "暂无数据", "var(--muted)");
+    }
+
+    // NAAIM
+    if (d.naaim) {
+      const v = d.naaim.value;
+      const color = v < 30 ? "var(--red)" : v < 70 ? "var(--yellow)" : "var(--green)";
+      const label = v < 30 ? "低仓" : v < 70 ? "中性" : "高仓";
+      setSentCard("sent-naaim", v + "%", label, color);
+    } else {
+      setSentCard("sent-naaim", "N/A", "暂无数据", "var(--muted)");
+    }
+
+    // AAII
+    if (d.aaii) {
+      const { bull, bear } = d.aaii;
+      const spread = bull - bear;
+      const color = spread > 10 ? "var(--green)" : spread < -10 ? "var(--red)" : "var(--yellow)";
+      setSentCard("sent-aaii", `${bull}%`, `牛↑ 熊${bear}%↓`, color);
+    } else {
+      setSentCard("sent-aaii", "N/A", "暂无数据", "var(--muted)");
+    }
+  } catch(e) {
+    ["sent-vix","sent-fg","sent-naaim","sent-aaii"].forEach(id =>
+      setSentCard(id, "N/A", "获取失败", "var(--muted)")
+    );
+  }
+}
+
+function setSentCard(id, value, label, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.querySelector(".sent-value").textContent = value;
+  el.querySelector(".sent-value").style.color  = color;
+  el.querySelector(".sent-label").textContent  = label;
+}
+
 // ── EUR 实时汇率 ──────────────────────────────────────────
 async function fetchEurRate() {
   try {
@@ -755,4 +814,6 @@ function initApp() {
   listenSettings();
   fetchEurRate();
   setInterval(fetchEurRate, 10 * 60 * 1000);
+  fetchSentiment();
+  setInterval(fetchSentiment, 30 * 60 * 1000);
 }
