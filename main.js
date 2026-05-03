@@ -383,12 +383,16 @@ function renderOverview() {
     return s + loss;
   }, 0);
 
-  // 资产计算
-  const totalMkt    = hArr.reduce((s,h) => s + ((h.current||h.price)*h.shares), 0);
-  const totalCost   = hArr.reduce((s,h) => s + (h.price*h.shares+(h.commission||0)), 0);
+  // 资产计算（区分现金类 vs 权益类）
+  const equityArr   = hArr.filter(h => h.type !== "cash-equiv");
+  const cashEquivArr= hArr.filter(h => h.type === "cash-equiv");
+  const totalMkt    = equityArr.reduce((s,h) => s + ((h.current||h.price)*h.shares), 0);
+  const totalCost   = equityArr.reduce((s,h) => s + (h.price*h.shares+(h.commission||0)), 0);
   const totalPnL    = totalMkt - totalCost;
+  const cashEquivMkt= cashEquivArr.reduce((s,h) => s + ((h.current||h.price)*h.shares), 0);
   const totalIncome = iArr.reduce((s,i) => s + i.amount, 0);
-  const totalAssets = totalMkt + cashBalance;
+  const liquidCash  = cashBalance + cashEquivMkt;   // 可控资金 = 现金 + 短债
+  const totalAssets = totalMkt + liquidCash;
   const totalReturn = totalPnL + totalIncome;
   const returnRate  = totalUSDCost > 0 ? (totalReturn / totalUSDCost * 100) : 0;
   const eurEquiv    = eurRate ? totalAssets * eurRate : null;
@@ -429,15 +433,27 @@ function renderOverview() {
   // ── 当前资产区块 ──
   document.getElementById("asset-block").innerHTML =
     `<div class="ov-row">
-      <span class="ov-label">持仓市值</span>
+      <span class="ov-label">权益持仓市值</span>
       <span class="ov-value">$${f2(totalMkt)}</span>
     </div>
-    <div class="ov-row">
-      <span class="ov-label">IBKR 现金余额</span>
-      <div class="cash-row">
-        <input class="cash-input" id="cash-balance-input" type="number" step="0.01"
-               placeholder="0.00" value="${cashBalance || ""}">
-        <button class="btn-sm-ghost" id="cash-save-btn">✓</button>
+    <div style="border-top:1px dashed var(--border);margin:6px 0;padding-top:6px">
+      <div style="font-size:11px;font-weight:600;color:var(--yellow);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">可控资金</div>
+      ${cashEquivArr.map(h => `
+      <div class="ov-row" style="padding:5px 0">
+        <span class="ov-label">${h.ticker} <span style="font-size:10px;color:var(--yellow)">[现金类]</span></span>
+        <span style="font-size:13px;font-weight:600;color:var(--yellow)">$${f2((h.current||h.price)*h.shares)}</span>
+      </div>`).join("")}
+      <div class="ov-row" style="padding:5px 0">
+        <span class="ov-label">IBKR 现金</span>
+        <div class="cash-row">
+          <input class="cash-input" id="cash-balance-input" type="number" step="0.01"
+                 placeholder="0.00" value="${cashBalance || ""}">
+          <button class="btn-sm-ghost" id="cash-save-btn">✓</button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid var(--border);margin-top:4px">
+        <span style="font-size:13px;font-weight:600;color:var(--yellow)">可控资金合计</span>
+        <span style="font-size:14px;font-weight:700;color:var(--yellow)">$${f2(liquidCash)}</span>
       </div>
     </div>
     <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:12px;
@@ -487,9 +503,10 @@ function renderOverview() {
         const mkt  = (h.current||h.price)*h.shares;
         const pnl  = mkt - cost;
         const pct  = cost > 0 ? (pnl/cost*100) : 0;
-        const tag  = h.type==="bond-etf" ? `<span class="tag tag-yellow">债券ETF</span>`
-                   : h.type==="etf"      ? `<span class="tag tag-blue">ETF</span>`
-                   :                       `<span class="tag tag-blue">股票</span>`;
+        const tag  = h.type==="cash-equiv" ? `<span class="tag tag-yellow">现金类</span>`
+                   : h.type==="bond-etf"   ? `<span class="tag tag-yellow">债券ETF</span>`
+                   : h.type==="etf"        ? `<span class="tag tag-blue">ETF</span>`
+                   :                         `<span class="tag tag-blue">股票</span>`;
         return `<div class="holding-card"><div class="holding-header">
           <div><div class="holding-ticker">${h.ticker} ${tag}</div>
           <div class="holding-sub">${h.name||""} · ${h.shares}股</div></div>
@@ -615,8 +632,8 @@ function renderHoldings() {
     const mkt       = (h.current||h.price)*h.shares;
     const pnl       = mkt - cost;
     const pct       = cost > 0 ? (pnl/cost*100) : 0;
-    const typeLabel = h.type==="bond-etf" ? "债券ETF" : h.type==="etf" ? "ETF" : "股票";
-    const tagCls    = h.type==="bond-etf" ? "tag-yellow" : "tag-blue";
+    const typeLabel = h.type==="cash-equiv" ? "现金类" : h.type==="bond-etf" ? "债券ETF" : h.type==="etf" ? "ETF" : "股票";
+    const tagCls    = h.type==="cash-equiv" || h.type==="bond-etf" ? "tag-yellow" : "tag-blue";
     return `<div class="holding-card">
       <div class="holding-header">
         <div><div class="holding-ticker">${h.ticker} <span class="tag ${tagCls}">${typeLabel}</span></div><div class="holding-sub">${h.name||""} · ${h.date}</div></div>
