@@ -105,14 +105,13 @@ async function fetchSentiment() {
       setSentCard("sent-naaim", "N/A", "暂无数据", "var(--muted)");
     }
 
-    // AAII
-    if (d.aaii) {
-      const { bull, bear } = d.aaii;
-      const spread = bull - bear;
-      const color = spread > 10 ? "var(--green)" : spread < -10 ? "var(--red)" : "var(--yellow)";
-      setSentCard("sent-aaii", `${bull}%`, `牛↑ 熊${bear}%↓`, color);
+    // Crypto Fear & Greed（全球风险偏好）
+    if (d.cryptoFG) {
+      const v = d.cryptoFG.value;
+      const color = v < 25 ? "var(--red)" : v < 45 ? "var(--yellow)" : v < 55 ? "var(--muted)" : v < 75 ? "var(--green)" : "#10b981";
+      setSentCard("sent-cfg", v, d.cryptoFG.label, color);
     } else {
-      setSentCard("sent-aaii", "N/A", "暂无数据", "var(--muted)");
+      setSentCard("sent-cfg", "N/A", "暂无数据", "var(--muted)");
     }
   } catch(e) {
     ["sent-vix","sent-fg","sent-naaim","sent-aaii"].forEach(id =>
