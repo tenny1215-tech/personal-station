@@ -31,40 +31,44 @@
 
   <div id="page-overview" class="page active">
 
-    <!-- 第一行：当前资产 + 收益分析 并排 -->
-    <div class="ov-top-grid">
-      <div class="card" id="asset-block"></div>
-      <div class="card" id="return-block"></div>
-    </div>
-
-    <!-- 第二行：资金流向成本 -->
-    <div class="section-title">资金流向成本</div>
-    <div class="card" id="flow-block"></div>
-
-    <!-- 第三行：市场情绪 -->
+    <!-- 第一行：市场情绪 -->
     <div class="section-title">市场情绪</div>
     <div class="sentiment-strip" id="sentiment-strip">
       <div class="sent-card" id="sent-vix">
         <div class="sent-name">VIX</div>
         <div class="sent-value">—</div>
         <div class="sent-label">加载中</div>
+        <div class="sent-freq">实时</div>
       </div>
       <div class="sent-card" id="sent-fg">
         <div class="sent-name">贪婪指数</div>
         <div class="sent-value">—</div>
         <div class="sent-label">加载中</div>
+        <div class="sent-freq">每日更新</div>
       </div>
       <div class="sent-card" id="sent-naaim">
         <div class="sent-name">NAAIM</div>
         <div class="sent-value">—</div>
         <div class="sent-label">加载中</div>
+        <div class="sent-freq">每周三</div>
       </div>
       <div class="sent-card" id="sent-cfg">
         <div class="sent-name">加密情绪</div>
         <div class="sent-value">—</div>
         <div class="sent-label">加载中</div>
+        <div class="sent-freq">每日更新</div>
       </div>
     </div>
+
+    <!-- 第二行：当前资产 + 收益分析 并排 -->
+    <div class="ov-top-grid">
+      <div class="card" id="asset-block"></div>
+      <div class="card" id="return-block"></div>
+    </div>
+
+    <!-- 第三行：资金流向成本 -->
+    <div class="section-title">资金流向成本</div>
+    <div class="card" id="flow-block"></div>
 
     <!-- 第四行：持仓快照 -->
     <div class="section-title">持仓快照</div>
