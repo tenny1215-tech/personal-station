@@ -30,11 +30,24 @@
   </div>
 
   <div id="page-overview" class="page active">
-    <div class="section-title">总览</div>
-    <div class="summary-grid" id="overview-grid"></div>
-    <div class="section-title">转账汇总</div>
-    <div class="card" id="flow-summary"></div>
-    <div class="section-title">我的持仓</div>
+    <div class="rate-widget" id="rate-widget">
+      <div class="rate-left">
+        <span>💱</span>
+        <span id="rate-display">获取汇率中…</span>
+      </div>
+      <span class="rate-time" id="rate-time"></span>
+    </div>
+
+    <div class="section-title">资金流向</div>
+    <div class="card" id="flow-block"></div>
+
+    <div class="section-title">当前资产</div>
+    <div class="card" id="asset-block"></div>
+
+    <div class="section-title">收益分析</div>
+    <div class="card" id="return-block"></div>
+
+    <div class="section-title">持仓快照</div>
     <div id="overview-holdings"></div>
   </div>
 

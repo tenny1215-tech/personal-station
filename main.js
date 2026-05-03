@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, addDoc, deleteDoc, doc,
-  onSnapshot, orderBy, query, serverTimestamp, updateDoc
+  onSnapshot, orderBy, query, serverTimestamp, updateDoc, setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -68,7 +68,38 @@ function closeAll() { ["select","transfer","holding","income"].forEach(closeModa
 });
 
 // ── 状态 ──────────────────────────────────────────────────
-let transfers={}, holdings={}, income={};
+let transfers={}, holdings={}, income={}, cashBalance=0, eurRate=null;
+
+// ── EUR 实时汇率 ──────────────────────────────────────────
+async function fetchEurRate() {
+  try {
+    const r = await fetch("https://api.frankfurter.app/latest?from=USD&to=EUR");
+    const data = await r.json();
+    eurRate = data.rates?.EUR || null;
+    if (eurRate) {
+      const now = new Date();
+      const hh = now.getHours().toString().padStart(2,"0");
+      const mm = now.getMinutes().toString().padStart(2,"0");
+      document.getElementById("rate-display").textContent = `1 USD = ${eurRate.toFixed(4)} EUR`;
+      document.getElementById("rate-time").textContent = `更新于 ${hh}:${mm}`;
+    }
+  } catch(e) {
+    document.getElementById("rate-display").textContent = "汇率获取失败";
+  }
+  renderOverview();
+}
+
+// ── IBKR 现金余额（存 Firestore settings/main）────────────
+function listenSettings() {
+  onSnapshot(doc(db, "settings", "main"), snap => {
+    cashBalance = snap.exists() ? (snap.data().cashBalance || 0) : 0;
+    renderOverview();
+  });
+}
+async function updateCashBalance(val) {
+  cashBalance = parseFloat(val) || 0;
+  await setDoc(doc(db, "settings", "main"), { cashBalance }, { merge: true });
+}
 
 function listenTransfers() {
   onSnapshot(query(collection(db,"transfers"), orderBy("date","desc")), snap => {
@@ -339,30 +370,116 @@ function renderOverview() {
   const tArr = Object.values(transfers);
   const hArr = Object.values(holdings);
   const iArr = Object.values(income);
-  const totalIBKR    = tArr.reduce((s,t) => s+t.ibkr, 0);
-  const totalCNY     = tArr.reduce((s,t) => s+t.totalCNY, 0);
-  const totalUSDCost = tArr.reduce((s,t) => s+t.totalUSDCost, 0);
-  const totalIncome  = iArr.reduce((s,i) => s+i.amount, 0);
-  const totalCost    = hArr.reduce((s,h) => s+(h.price*h.shares+(h.commission||0)), 0);
-  const totalMkt     = hArr.reduce((s,h) => s+((h.current||h.price)*h.shares), 0);
-  const totalPnL     = totalMkt - totalCost;
-  const totalReturn  = totalUSDCost > 0 ? ((totalPnL+totalIncome)/totalUSDCost*100) : 0;
 
-  document.getElementById("overview-grid").innerHTML =
-    `<div class="summary-card"><div class="summary-label">IBKR 到账</div><div class="summary-value accent">$${f0(totalIBKR)}</div></div>`+
-    `<div class="summary-card"><div class="summary-label">总人民币支出</div><div class="summary-value">¥${f0(totalCNY)}</div></div>`+
-    `<div class="summary-card"><div class="summary-label">持仓盈亏</div><div class="summary-value" style="color:${pnlColor(totalPnL)}">${sign(totalPnL)}$${f2(totalPnL)}</div></div>`+
-    `<div class="summary-card"><div class="summary-label">利息/股息</div><div class="summary-value green">+$${f2(totalIncome)}</div></div>`+
-    `<div class="summary-card"><div class="summary-label">等值美金成本</div><div class="summary-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</div></div>`+
-    `<div class="summary-card"><div class="summary-label">真实回报率</div><div class="summary-value" style="color:${pnlColor(totalReturn)}">${sign(totalReturn)}${f2(totalReturn)}%</div></div>`;
+  // 资金流向计算
+  const totalCNYSpent  = tArr.reduce((s,t) => s + (t.cnySpent||0), 0);
+  const totalWireFee   = tArr.reduce((s,t) => s + (t.wireFee||0), 0);
+  const totalIBKR      = tArr.reduce((s,t) => s + (t.ibkr||0), 0);
+  const totalUSDCost   = tArr.reduce((s,t) => s + (t.totalUSDCost||0), 0);
+  const totalLoss      = tArr.reduce((s,t) => {
+    const loss = t.totalUSDCost > 0
+      ? t.totalUSDCost - (t.ibkr||0) - (t.hsbcRemaining||0)
+      : (t.ibkrFee||0);
+    return s + loss;
+  }, 0);
 
-  document.getElementById("flow-summary").innerHTML = tArr.length === 0
-    ? `<div style="color:var(--muted);font-size:14px;">还没有记录，点右下角 ＋ 开始</div>`
-    : `<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">共 ${tArr.length} 笔转账</div>`+
-      `<div style="font-size:15px;font-weight:600;line-height:2">`+
-      `¥${f0(totalCNY)} → <span style="color:var(--accent)">$${f2(totalIBKR)}</span> 到账<br>`+
-      `<span style="font-size:13px;color:var(--yellow)">等值美金总成本 $${f2(totalUSDCost)}（含所有手续费）</span></div>`;
+  // 资产计算
+  const totalMkt    = hArr.reduce((s,h) => s + ((h.current||h.price)*h.shares), 0);
+  const totalCost   = hArr.reduce((s,h) => s + (h.price*h.shares+(h.commission||0)), 0);
+  const totalPnL    = totalMkt - totalCost;
+  const totalIncome = iArr.reduce((s,i) => s + i.amount, 0);
+  const totalAssets = totalMkt + cashBalance;
+  const totalReturn = totalPnL + totalIncome;
+  const returnRate  = totalUSDCost > 0 ? (totalReturn / totalUSDCost * 100) : 0;
+  const eurEquiv    = eurRate ? totalAssets * eurRate : null;
 
+  // ── 资金流向区块 ──
+  const sortedT = [...tArr].sort((a,b) => a.date < b.date ? 1 : -1);
+  document.getElementById("flow-block").innerHTML =
+    `<div class="ov-row">
+      <span class="ov-label">总人民币支出</span>
+      <span class="ov-value">¥${f0(totalCNYSpent + totalWireFee)}</span>
+    </div>
+    <div class="ov-row">
+      <span class="ov-label">折损成本</span>
+      <span class="ov-value" style="color:var(--red)">-$${f2(totalLoss)}</span>
+    </div>
+    <div class="ov-row" style="border-bottom:none">
+      <span class="ov-label">实际到账 IBKR</span>
+      <span class="ov-value" style="color:var(--accent)">$${f2(totalIBKR)}</span>
+    </div>
+    ${sortedT.length > 0 ? `
+    <table class="flow-table">
+      <thead><tr>
+        <th>日期</th><th>人民币支出</th><th>折损</th><th>到账</th>
+      </tr></thead>
+      <tbody>${sortedT.map(t => {
+        const loss = t.totalUSDCost > 0
+          ? t.totalUSDCost - (t.ibkr||0) - (t.hsbcRemaining||0)
+          : (t.ibkrFee||0);
+        return `<tr>
+          <td style="color:var(--muted)">${t.date}</td>
+          <td>¥${f0(t.cnySpent)}</td>
+          <td style="color:var(--red)">-$${f2(loss)}</td>
+          <td style="color:var(--accent)">$${f2(t.ibkr)}</td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>` : ""}`;
+
+  // ── 当前资产区块 ──
+  document.getElementById("asset-block").innerHTML =
+    `<div class="ov-row">
+      <span class="ov-label">持仓市值</span>
+      <span class="ov-value">$${f2(totalMkt)}</span>
+    </div>
+    <div class="ov-row">
+      <span class="ov-label">IBKR 现金余额</span>
+      <div class="cash-row">
+        <input class="cash-input" id="cash-balance-input" type="number" step="0.01"
+               placeholder="0.00" value="${cashBalance || ""}">
+        <button class="btn-sm-ghost" id="cash-save-btn">✓</button>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:12px;
+                display:flex;justify-content:space-between;align-items:flex-start">
+      <span style="font-size:14px;font-weight:600">总资产</span>
+      <div style="text-align:right">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">$${f2(totalAssets)}</div>
+        ${eurEquiv !== null ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">≈ €${f2(eurEquiv)}</div>` : ""}
+      </div>
+    </div>`;
+
+  document.getElementById("cash-save-btn").addEventListener("click", () => {
+    updateCashBalance(document.getElementById("cash-balance-input").value);
+  });
+  document.getElementById("cash-balance-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") updateCashBalance(e.target.value);
+  });
+
+  // ── 收益分析区块 ──
+  document.getElementById("return-block").innerHTML =
+    `<div class="ov-row">
+      <span class="ov-label">真实投入成本</span>
+      <span class="ov-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</span>
+    </div>
+    <div class="ov-row">
+      <span class="ov-label">持仓盈亏</span>
+      <span class="ov-value" style="color:${pnlColor(totalPnL)}">${sign(totalPnL)}$${f2(totalPnL)}</span>
+    </div>
+    <div class="ov-row">
+      <span class="ov-label">利息 / 股息</span>
+      <span class="ov-value" style="color:var(--green)">+$${f2(totalIncome)}</span>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:12px;
+                display:flex;justify-content:space-between;align-items:flex-start">
+      <span style="font-size:14px;font-weight:600">真实回报率</span>
+      <div style="text-align:right">
+        <div style="font-size:20px;font-weight:700;color:${pnlColor(returnRate)}">${sign(returnRate)}${f2(returnRate)}%</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${sign(totalReturn)}$${f2(totalReturn)}</div>
+      </div>
+    </div>`;
+
+  // ── 持仓快照 ──
   document.getElementById("overview-holdings").innerHTML = hArr.length === 0
     ? `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">还没有持仓</div></div>`
     : hArr.map(h => {
@@ -373,7 +490,13 @@ function renderOverview() {
         const tag  = h.type==="bond-etf" ? `<span class="tag tag-yellow">债券ETF</span>`
                    : h.type==="etf"      ? `<span class="tag tag-blue">ETF</span>`
                    :                       `<span class="tag tag-blue">股票</span>`;
-        return `<div class="holding-card"><div class="holding-header"><div><div class="holding-ticker">${h.ticker} ${tag}</div><div class="holding-sub">${h.name||""} · ${h.shares}股</div></div><div class="holding-pnl"><div class="amount" style="color:${pnlColor(pnl)}">${sign(pnl)}$${f2(pnl)}</div><div class="pct">${sign(pct)}${f2(pct)}%</div></div></div></div>`;
+        return `<div class="holding-card"><div class="holding-header">
+          <div><div class="holding-ticker">${h.ticker} ${tag}</div>
+          <div class="holding-sub">${h.name||""} · ${h.shares}股</div></div>
+          <div class="holding-pnl">
+            <div class="amount" style="color:${pnlColor(pnl)}">${sign(pnl)}$${f2(pnl)}</div>
+            <div class="pct">${sign(pct)}${f2(pct)}%</div>
+          </div></div></div>`;
       }).join("");
 }
 
@@ -612,4 +735,7 @@ function initApp() {
   listenTransfers();
   listenHoldings();
   listenIncome();
+  listenSettings();
+  fetchEurRate();
+  setInterval(fetchEurRate, 10 * 60 * 1000);
 }
