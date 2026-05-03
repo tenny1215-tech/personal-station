@@ -30,7 +30,19 @@
   </div>
 
   <div id="page-overview" class="page active">
-    <!-- 市场情绪条 -->
+
+    <!-- 第一行：当前资产 + 收益分析 并排 -->
+    <div class="ov-top-grid">
+      <div class="card" id="asset-block"></div>
+      <div class="card" id="return-block"></div>
+    </div>
+
+    <!-- 第二行：资金流向成本 -->
+    <div class="section-title">资金流向成本</div>
+    <div class="card" id="flow-block"></div>
+
+    <!-- 第三行：市场情绪 -->
+    <div class="section-title">市场情绪</div>
     <div class="sentiment-strip" id="sentiment-strip">
       <div class="sent-card" id="sent-vix">
         <div class="sent-name">VIX</div>
@@ -54,23 +66,7 @@
       </div>
     </div>
 
-    <div class="rate-widget" id="rate-widget">
-      <div class="rate-left">
-        <span>💱</span>
-        <span id="rate-display">获取汇率中…</span>
-      </div>
-      <span class="rate-time" id="rate-time"></span>
-    </div>
-
-    <div class="section-title">资金流向</div>
-    <div class="card" id="flow-block"></div>
-
-    <div class="section-title">当前资产</div>
-    <div class="card" id="asset-block"></div>
-
-    <div class="section-title">收益分析</div>
-    <div class="card" id="return-block"></div>
-
+    <!-- 第四行：持仓快照 -->
     <div class="section-title">持仓快照</div>
     <div id="overview-holdings"></div>
   </div>

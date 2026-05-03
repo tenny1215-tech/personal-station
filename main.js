@@ -134,15 +134,8 @@ async function fetchEurRate() {
     const r = await fetch("https://api.frankfurter.app/latest?from=USD&to=EUR");
     const data = await r.json();
     eurRate = data.rates?.EUR || null;
-    if (eurRate) {
-      const now = new Date();
-      const hh = now.getHours().toString().padStart(2,"0");
-      const mm = now.getMinutes().toString().padStart(2,"0");
-      document.getElementById("rate-display").textContent = `1 USD = ${eurRate.toFixed(4)} EUR`;
-      document.getElementById("rate-time").textContent = `更新于 ${hh}:${mm}`;
-    }
   } catch(e) {
-    document.getElementById("rate-display").textContent = "汇率获取失败";
+    // 汇率获取失败，renderOverview 会跳过 EUR 显示
   }
   renderOverview();
 }
@@ -488,38 +481,25 @@ function renderOverview() {
       }).join("")}</tbody>
     </table>` : ""}`;
 
-  // ── 当前资产区块 ──
+  // ── 当前资产卡片（左列，紧凑版）──
   document.getElementById("asset-block").innerHTML =
-    `<div class="ov-row">
-      <span class="ov-label">权益持仓市值</span>
-      <span class="ov-value">$${f2(totalMkt)}</span>
+    `<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">当前资产</div>
+    <div style="font-size:22px;font-weight:700;color:var(--accent);line-height:1">$${f2(totalAssets)}</div>
+    ${eurEquiv !== null ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;margin-bottom:12px">≈ €${f2(eurEquiv)}</div>` : `<div style="margin-bottom:12px"></div>`}
+    <div class="ov-mini-row">
+      <span class="ov-mini-label">权益持仓</span>
+      <span class="ov-mini-value">$${f2(totalMkt)}</span>
     </div>
-    <div style="border-top:1px dashed var(--border);margin:6px 0;padding-top:6px">
-      <div style="font-size:11px;font-weight:600;color:var(--yellow);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">可控资金</div>
-      ${cashEquivArr.map(h => `
-      <div class="ov-row" style="padding:5px 0">
-        <span class="ov-label">${h.ticker} <span style="font-size:10px;color:var(--yellow)">[现金类]</span></span>
-        <span style="font-size:13px;font-weight:600;color:var(--yellow)">$${f2((h.current||h.price)*h.shares)}</span>
-      </div>`).join("")}
-      <div class="ov-row" style="padding:5px 0">
-        <span class="ov-label">IBKR 现金</span>
-        <div class="cash-row">
-          <input class="cash-input" id="cash-balance-input" type="number" step="0.01"
-                 placeholder="0.00" value="${cashBalance || ""}">
-          <button class="btn-sm-ghost" id="cash-save-btn">✓</button>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid var(--border);margin-top:4px">
-        <span style="font-size:13px;font-weight:600;color:var(--yellow)">可控资金合计</span>
-        <span style="font-size:14px;font-weight:700;color:var(--yellow)">$${f2(liquidCash)}</span>
-      </div>
+    <div class="ov-mini-row" style="color:var(--yellow)">
+      <span class="ov-mini-label" style="color:var(--yellow)">可控资金</span>
+      <span class="ov-mini-value" style="color:var(--yellow)">$${f2(liquidCash)}</span>
     </div>
-    <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:12px;
-                display:flex;justify-content:space-between;align-items:flex-start">
-      <span style="font-size:14px;font-weight:600">总资产</span>
-      <div style="text-align:right">
-        <div style="font-size:20px;font-weight:700;color:var(--accent)">$${f2(totalAssets)}</div>
-        ${eurEquiv !== null ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">≈ €${f2(eurEquiv)}</div>` : ""}
+    <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">IBKR 现金</div>
+      <div class="cash-row">
+        <input class="cash-input" id="cash-balance-input" type="number" step="0.01"
+               placeholder="0.00" value="${cashBalance || ""}" style="width:80px;font-size:12px;padding:4px 8px">
+        <button class="btn-sm-ghost" id="cash-save-btn" style="font-size:11px;padding:4px 8px">✓</button>
       </div>
     </div>`;
 
@@ -530,27 +510,26 @@ function renderOverview() {
     if (e.key === "Enter") updateCashBalance(e.target.value);
   });
 
-  // ── 收益分析区块 ──
+  // ── 收益分析卡片（右列，紧凑版）──
   document.getElementById("return-block").innerHTML =
-    `<div class="ov-row">
-      <span class="ov-label">真实投入成本</span>
-      <span class="ov-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</span>
+    `<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">收益分析</div>
+    <div style="font-size:22px;font-weight:700;color:${pnlColor(returnRate)};line-height:1">${sign(returnRate)}${f2(returnRate)}%</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:3px;margin-bottom:12px">真实回报率</div>
+    <div class="ov-mini-row">
+      <span class="ov-mini-label">投入成本</span>
+      <span class="ov-mini-value" style="color:var(--yellow)">$${f2(totalUSDCost)}</span>
     </div>
-    <div class="ov-row">
-      <span class="ov-label">持仓盈亏</span>
-      <span class="ov-value" style="color:${pnlColor(totalPnL)}">${sign(totalPnL)}$${f2(totalPnL)}</span>
+    <div class="ov-mini-row">
+      <span class="ov-mini-label">持仓盈亏</span>
+      <span class="ov-mini-value" style="color:${pnlColor(totalPnL)}">${sign(totalPnL)}$${f2(totalPnL)}</span>
     </div>
-    <div class="ov-row">
-      <span class="ov-label">利息 / 股息</span>
-      <span class="ov-value" style="color:var(--green)">+$${f2(totalIncome)}</span>
+    <div class="ov-mini-row">
+      <span class="ov-mini-label">利息股息</span>
+      <span class="ov-mini-value" style="color:var(--green)">+$${f2(totalIncome)}</span>
     </div>
-    <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:12px;
-                display:flex;justify-content:space-between;align-items:flex-start">
-      <span style="font-size:14px;font-weight:600">真实回报率</span>
-      <div style="text-align:right">
-        <div style="font-size:20px;font-weight:700;color:${pnlColor(returnRate)}">${sign(returnRate)}${f2(returnRate)}%</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">${sign(totalReturn)}$${f2(totalReturn)}</div>
-      </div>
+    <div class="ov-mini-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">
+      <span class="ov-mini-label">总回报</span>
+      <span class="ov-mini-value" style="color:${pnlColor(totalReturn)}">${sign(totalReturn)}$${f2(totalReturn)}</span>
     </div>`;
 
   // ── 持仓快照 ──
