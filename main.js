@@ -50,7 +50,7 @@ function sign(n) { return n >= 0 ? "+" : ""; }
 function today() { return new Date().toISOString().slice(0,10); }
 
 // ── 导航 ──────────────────────────────────────────────────
-const pages = ["overview","transfers","holdings","income"];
+const pages = ["overview","transfers","holdings","income","advisor"];
 function showPage(name) {
   pages.forEach(p => {
     document.getElementById("page-"+p).classList.toggle("active", p===name);
@@ -756,6 +756,7 @@ function initApp() {
   document.getElementById("nav-transfers").addEventListener("click", () => showPage("transfers"));
   document.getElementById("nav-holdings").addEventListener("click",  () => showPage("holdings"));
   document.getElementById("nav-income").addEventListener("click",    () => showPage("income"));
+  document.getElementById("nav-advisor").addEventListener("click",   () => showPage("advisor"));
   document.getElementById("fab").addEventListener("click", () => openModal("select"));
 
   document.getElementById("btn-add-transfer").addEventListener("click", () => { closeAll(); resetTransferForm(); openModal("transfer"); });
@@ -794,4 +795,79 @@ function initApp() {
   setInterval(fetchEurRate, 10 * 60 * 1000);
   fetchSentiment();
   setInterval(fetchSentiment, 30 * 60 * 1000);
+
+  // ── 选股分析 ──────────────────────────────────────────
+  const advBtn    = document.getElementById("adv-btn");
+  const advTicker = document.getElementById("adv-ticker");
+
+  async function runAnalyze() {
+    const ticker = advTicker.value.trim().toUpperCase();
+    if (!ticker) { advTicker.focus(); return; }
+
+    advBtn.disabled = true;
+    document.getElementById("adv-loading").style.display = "block";
+    document.getElementById("adv-result").style.display  = "none";
+
+    const statuses = ["搜索最新财务数据…","获取估值指标…","分析技术走势…","综合评估中…"];
+    let si = 0;
+    const statusEl = document.getElementById("adv-status");
+    const timer = setInterval(() => { statusEl.textContent = statuses[si++ % statuses.length]; }, 1800);
+
+    try {
+      const context = document.getElementById("adv-context").value.trim();
+      const resp = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker, context })
+      });
+      const data = await resp.json();
+      clearInterval(timer);
+
+      let fullText = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+      let scores = { quality:7, valuation:6, momentum:6, verdict:"NEUTRAL" };
+      const m = fullText.match(/SCORES:(\{[^}]+\})/);
+      if (m) { try { scores = JSON.parse(m[1]); } catch(e){} fullText = fullText.replace(/SCORES:\{[^}]+\}\n?/, "").trim(); }
+
+      renderAdvResult(ticker, scores, fullText);
+    } catch(e) {
+      clearInterval(timer);
+      document.getElementById("adv-content").textContent = "分析失败：" + e.message;
+      document.getElementById("adv-result").style.display = "block";
+    }
+
+    document.getElementById("adv-loading").style.display = "none";
+    advBtn.disabled = false;
+  }
+
+  function renderAdvResult(ticker, scores, text) {
+    document.getElementById("adv-out-ticker").textContent = ticker;
+    const vMap = { BUY:{l:"建议买入",c:"var(--green)"}, HOLD:{l:"建议持有",c:"var(--yellow)"}, SELL:{l:"建议卖出",c:"var(--red)"}, NEUTRAL:{l:"中性观望",c:"var(--muted)"} };
+    const v = vMap[scores.verdict] || vMap.NEUTRAL;
+    const vEl = document.getElementById("adv-verdict");
+    vEl.textContent = v.l; vEl.style.color = v.c; vEl.style.borderColor = v.c;
+
+    const labels = { quality:"质量", valuation:"估值", momentum:"趋势" };
+    document.getElementById("adv-scores").innerHTML = Object.entries(labels).map(([k,l]) => {
+      const val = scores[k] || 5;
+      const color = val >= 7 ? "var(--green)" : val >= 5 ? "var(--yellow)" : "var(--red)";
+      return `<div class="adv-score-card">
+        <div class="adv-score-label">${l}</div>
+        <div class="adv-score-val" style="color:${color}">${val}<span>/10</span></div>
+        <div class="adv-score-bar"><div style="width:${val*10}%;background:${color}"></div></div>
+      </div>`;
+    }).join("");
+
+    document.getElementById("adv-content").textContent = text;
+    document.getElementById("adv-result").style.display = "block";
+  }
+
+  advBtn.addEventListener("click", runAnalyze);
+  advTicker.addEventListener("keydown", e => { if (e.key === "Enter") runAnalyze(); });
+  document.querySelectorAll(".adv-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      advTicker.value = chip.dataset.ticker;
+      document.getElementById("adv-context").value = "";
+      runAnalyze();
+    });
+  });
 }

@@ -90,13 +90,46 @@
     <div id="income-list"></div>
   </div>
 
+  <div id="page-advisor" class="page">
+    <div class="adv-input-box">
+      <div class="adv-row">
+        <input class="adv-ticker" id="adv-ticker" type="text" placeholder="股票代码  如 AAPL" maxlength="10">
+        <button class="adv-btn" id="adv-btn">分析</button>
+      </div>
+      <textarea class="adv-context" id="adv-context" placeholder="补充背景（可选）：已持仓？考虑买入还是卖出？有什么顾虑？"></textarea>
+      <div class="adv-chips">
+        <span class="adv-chip" data-ticker="NVDA">NVDA</span>
+        <span class="adv-chip" data-ticker="AAPL">AAPL</span>
+        <span class="adv-chip" data-ticker="MSFT">MSFT</span>
+        <span class="adv-chip" data-ticker="TSLA">TSLA</span>
+        <span class="adv-chip" data-ticker="META">META</span>
+      </div>
+    </div>
+
+    <div class="adv-loading" id="adv-loading">
+      <div class="adv-dots"><span></span><span></span><span></span></div>
+      <div class="adv-loading-text">搜索实时数据并分析中…</div>
+      <div class="adv-loading-status" id="adv-status"></div>
+    </div>
+
+    <div class="adv-result" id="adv-result">
+      <div class="adv-result-header">
+        <div class="adv-result-ticker" id="adv-out-ticker">—</div>
+        <div class="adv-verdict" id="adv-verdict">—</div>
+      </div>
+      <div class="adv-scores" id="adv-scores"></div>
+      <div class="adv-content" id="adv-content"></div>
+      <div class="adv-disclaimer">⚠ AI 辅助分析，不构成投资建议，决策需自行判断</div>
+    </div>
+  </div>
+
   <button class="fab" id="fab">＋</button>
 
   <nav class="bottom-nav">
     <button class="nav-item active" id="nav-overview"><span class="nav-icon">📊</span>总览</button>
     <button class="nav-item" id="nav-transfers"><span class="nav-icon">💸</span>转账</button>
     <button class="nav-item" id="nav-holdings"><span class="nav-icon">📈</span>持仓</button>
-    <button class="nav-item" id="nav-income"><span class="nav-icon">💰</span>收入</button>
+    <button class="nav-item" id="nav-advisor"><span class="nav-icon">🔍</span>选股</button>
   </nav>
 </div>
 
