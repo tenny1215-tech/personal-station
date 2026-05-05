@@ -50,7 +50,7 @@ function sign(n) { return n >= 0 ? "+" : ""; }
 function today() { return new Date().toISOString().slice(0,10); }
 
 // ── 导航 ──────────────────────────────────────────────────
-const pages = ["overview","transfers","holdings","income","advisor"];
+const pages = ["overview","transfers","holdings","advisor"];
 function showPage(name) {
   pages.forEach(p => {
     document.getElementById("page-"+p).classList.toggle("active", p===name);
