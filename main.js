@@ -822,7 +822,16 @@ function initApp() {
       const data = await resp.json();
       clearInterval(timer);
 
+      if (data.type === "error" || data.error) {
+        const errMsg = data.error?.message || data.message || JSON.stringify(data);
+        throw new Error("API 错误：" + errMsg);
+      }
+
       let fullText = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+      if (!fullText) {
+        const raw = JSON.stringify(data).slice(0, 300);
+        throw new Error("未获取到分析内容，原始响应：" + raw);
+      }
       let scores = { quality:7, valuation:6, momentum:6, verdict:"NEUTRAL" };
       const m = fullText.match(/SCORES:(\{[^}]+\})/);
       if (m) { try { scores = JSON.parse(m[1]); } catch(e){} fullText = fullText.replace(/SCORES:\{[^}]+\}\n?/, "").trim(); }
