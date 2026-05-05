@@ -854,14 +854,16 @@ function initApp() {
     const vEl = document.getElementById("adv-verdict");
     vEl.textContent = v.l; vEl.style.color = v.c; vEl.style.borderColor = v.c;
 
-    const labels = { quality:"质量", valuation:"估值", momentum:"趋势" };
-    document.getElementById("adv-scores").innerHTML = Object.entries(labels).map(([k,l]) => {
+    const labels = { quality:["质量","ROE · 毛利率","q_note"], valuation:["估值","PE · PEG","v_note"], momentum:["趋势","12m涨跌 · 均线","m_note"] };
+    document.getElementById("adv-scores").innerHTML = Object.entries(labels).map(([k,[l,hint,noteKey]]) => {
       const val = scores[k] || 5;
       const color = val >= 7 ? "var(--green)" : val >= 5 ? "var(--yellow)" : "var(--red)";
+      const note = scores[noteKey] ? `<div class="adv-score-note">${scores[noteKey]}</div>` : `<div class="adv-score-note">${hint}</div>`;
       return `<div class="adv-score-card">
         <div class="adv-score-label">${l}</div>
         <div class="adv-score-val" style="color:${color}">${val}<span>/10</span></div>
         <div class="adv-score-bar"><div style="width:${val*10}%;background:${color}"></div></div>
+        ${note}
       </div>`;
     }).join("");
 
