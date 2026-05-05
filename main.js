@@ -755,7 +755,6 @@ function initApp() {
   document.getElementById("nav-overview").addEventListener("click",  () => showPage("overview"));
   document.getElementById("nav-transfers").addEventListener("click", () => showPage("transfers"));
   document.getElementById("nav-holdings").addEventListener("click",  () => showPage("holdings"));
-  document.getElementById("nav-income").addEventListener("click",    () => showPage("income"));
   document.getElementById("nav-advisor").addEventListener("click",   () => showPage("advisor"));
   document.getElementById("fab").addEventListener("click", () => openModal("select"));
 
