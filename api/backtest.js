@@ -19,12 +19,8 @@ export default async function handler(req, res) {
     const end = endTime ? parseInt(endTime) : Date.now();
     const start = startTime ? parseInt(startTime) : end - 365 * 24 * 60 * 60 * 1000;
 
-    const candles = await fetchKlines(
-      String(symbol).toUpperCase().replace("/", "").replace("-", ""),
-      "1d",
-      start,
-      end
-    );
+    const sym = String(symbol).toUpperCase().replace("/", "").replace("-", "");
+    const candles = await fetchKlines(sym, start, end);
     if (!candles.length) throw new Error("未获取到K线数据，请检查交易对名称");
 
     const ma = calcSMA(candles.map(c => c.close), parseInt(maPeriod));
@@ -46,44 +42,55 @@ export default async function handler(req, res) {
   }
 }
 
-async function fetchKlines(symbol, interval, startTime, endTime) {
+async function fetchKlines(symbol, startTime, endTime) {
   const all = [];
-  let from = startTime;
+  let endMs = endTime;
 
-  while (from < endTime) {
+  while (true) {
     const params = new URLSearchParams({
+      category: "spot",
       symbol,
-      interval,
-      startTime: String(from),
-      endTime: String(endTime),
+      interval: "D",
+      start: String(startTime),
+      end: String(endMs),
       limit: "1000",
     });
 
     const resp = await fetch(
-      `https://api.binance.com/api/v3/klines?${params}`,
+      `https://api.bybit.com/v5/market/kline?${params}`,
       { headers: { "User-Agent": "Mozilla/5.0" } }
     );
-    if (!resp.ok) throw new Error(`Binance API 错误: ${resp.status}`);
-    const raw = await resp.json();
-    if (raw.code) throw new Error(`Binance: ${raw.msg}`);
-    if (!raw.length) break;
+    if (!resp.ok) throw new Error(`Bybit API 错误: ${resp.status}`);
+    const json = await resp.json();
+    if (json.retCode !== 0) throw new Error(`Bybit: ${json.retMsg}`);
 
-    all.push(
-      ...raw.map(k => ({
-        time: new Date(k[0]).toISOString().slice(0, 10),
-        open: +parseFloat(k[1]).toFixed(4),
-        high: +parseFloat(k[2]).toFixed(4),
-        low: +parseFloat(k[3]).toFixed(4),
-        close: +parseFloat(k[4]).toFixed(4),
-        volume: +parseFloat(k[5]).toFixed(2),
-      }))
-    );
+    const list = json.result?.list;
+    if (!list || !list.length) break;
 
-    if (raw.length < 1000) break;
-    from = raw[raw.length - 1][0] + 1;
+    // list is newest-first, reverse to ascending order
+    const batch = [...list].reverse().map(k => ({
+      time: new Date(parseInt(k[0])).toISOString().slice(0, 10),
+      open: +parseFloat(k[1]).toFixed(4),
+      high: +parseFloat(k[2]).toFixed(4),
+      low: +parseFloat(k[3]).toFixed(4),
+      close: +parseFloat(k[4]).toFixed(4),
+      volume: +parseFloat(k[5]).toFixed(2),
+    }));
+
+    all.unshift(...batch);
+    if (list.length < 1000) break;
+
+    // paginate: fetch data older than this batch
+    const oldestMs = parseInt(list[list.length - 1][0]);
+    if (oldestMs <= startTime) break;
+    endMs = oldestMs - 1;
   }
 
-  return all;
+  // deduplicate and sort
+  const seen = new Set();
+  return all
+    .sort((a, b) => a.time.localeCompare(b.time))
+    .filter(c => { if (seen.has(c.time)) return false; seen.add(c.time); return true; });
 }
 
 function calcSMA(closes, period) {
