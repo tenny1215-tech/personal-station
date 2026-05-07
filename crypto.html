@@ -214,6 +214,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 </div>
 
 <script>
+// ── 状态（必须在所有函数调用之前声明）────────────────────────────
+let chart = null, candleSeries = null, maSeries = null;
+let currentStrategy = "dca";
+
 // ── 密码锁 ──────────────────────────────────────────────────
 const PASSWORD = "1215";
 function checkAuth() { return sessionStorage.getItem("cr_auth") === "ok"; }
@@ -234,10 +238,6 @@ document.getElementById("lock-input").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("lock-btn").click();
 });
 if (checkAuth()) unlock();
-
-// ── 状态 ─────────────────────────────────────────────────────
-let chart = null, candleSeries = null, maSeries = null;
-let currentStrategy = "dca";
 
 // ── 初始化页面 ────────────────────────────────────────────────
 function initPage() {
